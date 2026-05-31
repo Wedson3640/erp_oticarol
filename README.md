@@ -1,4 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# erp_otica_carol — ERP Ótica Carol (Produção)
+
+> Sistema de gestão completo da Ótica Carol — Teresina, PI.
+
+## Stack
+- Next.js 16 + TypeScript
+- Tailwind CSS + Mantine v7
+- Supabase (PostgreSQL + Auth + Storage + Realtime)
+- Framer Motion · Recharts · Open Sans
+
+## Módulos planejados
+| Fase | Módulos |
+|------|---------|
+| Fase 1 | Auth, Pedidos, Garantias, CRM |
+| Fase 2 | Solicitações, Funcionários, Metas, Usuários |
+| Fase 3 | Relatórios, Gráficos, Acertos, Features Rails |
+
+## Como rodar
+```bash
+cp .env.example .env.local   # configurar Supabase
+npm install
+npm run dev   # http://localhost:3001
+```
+
+## Protótipo
+O mockup visual está em `../erp-carol-mockup` (oticarol_dev).
 
 ## Getting Started
 
