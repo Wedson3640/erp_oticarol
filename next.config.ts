@@ -1,7 +1,10 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  turbopack: {
+    // Define explicitamente a raiz do workspace para suprimir aviso de lockfile
+    root: __dirname,
+  },
+}
 
-export default nextConfig;
+export default nextConfig
