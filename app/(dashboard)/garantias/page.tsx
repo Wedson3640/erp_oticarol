@@ -28,7 +28,15 @@ interface WarrantyRow {
   scheduled_delivery:string | null
   store:             { id: number; code: string; name: string } | null
   problem:           { id: number; name: string } | null
-  service_order:     { id: number; os_number: string; os_sequence: string | null; customer_name: string | null } | null
+  service_order:     {
+    id: number
+    os_number: string
+    os_sequence: string | null
+    customer_name: string | null
+    customer_cpf:  string | null
+    purchase_date: string | null
+    scheduled_delivery: string | null
+  } | null
 }
 
 const WARRANTY_SITUATIONS = ["Início", "Intermediário", "Encerrado"]
@@ -95,12 +103,12 @@ export default function GarantiasPage() {
         .select(
           `id, situation, customer_name, customer_cpf, request_date, scheduled_delivery,
            store:stores!store_id(id,code,name),
-           problem:warranty_problems!problem_id(id,name),
-           service_order:service_orders!service_order_id(id,os_number,os_sequence,customer_name)`,
+           problem:warranty_problems!fk_warranties_problem_id(id,name),
+           service_order:service_orders!service_order_id(id,os_number,os_sequence,customer_name,customer_cpf,purchase_date,scheduled_delivery)`,
           { count: "exact" },
         )
         .is("deleted_at", null)
-        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
 
       if (situacaoFilter) q = q.eq("situation", situacaoFilter)
       if (lojaFilter)     q = q.eq("store_id",  parseInt(lojaFilter))
@@ -356,10 +364,15 @@ export default function GarantiasPage() {
               ) : (
                 warranties.map((w, i) => {
                   const sit    = w.situation ?? "Início"
-                  const ok     = prazoOk(w.scheduled_delivery)
-                  const prazoV = fmtDate(w.scheduled_delivery)
-                  const abertura = fmtDate(w.request_date ?? undefined)
-                  const osLink = w.service_order
+                  // Fallback em cascata: campo da garantia → campo do pedido pai
+                  const prazoRaw   = w.scheduled_delivery ?? w.service_order?.scheduled_delivery ?? null
+                  const aberturaRaw= w.request_date       ?? w.service_order?.purchase_date      ?? null
+                  const clienteNome= w.customer_name      ?? w.service_order?.customer_name      ?? "—"
+                  const clienteCpf = w.customer_cpf       ?? w.service_order?.customer_cpf       ?? null
+                  const ok         = prazoOk(prazoRaw)
+                  const prazoV     = fmtDate(prazoRaw)
+                  const abertura   = fmtDate(aberturaRaw ?? undefined)
+                  const osLink     = w.service_order
                     ? `${w.service_order.os_number}${w.service_order.os_sequence ? "/" + w.service_order.os_sequence : ""}`
                     : "—"
 
@@ -372,31 +385,45 @@ export default function GarantiasPage() {
                       onMouseEnter={e => (e.currentTarget.style.background = "#f8faff")}
                       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                     >
+                      {/* # GARANTIA */}
                       <td className="px-4 py-3">
                         <Link href={`/garantias/${w.id}`}
-                          className="font-mono font-bold text-xs hover:underline" style={{ color: "#1d4ed8" }}>
+                          className="font-mono font-bold hover:underline" style={{ fontSize: 13, color: "#1d4ed8" }}>
                           GR-{String(w.id).padStart(3, "0")}
                         </Link>
                       </td>
+
+                      {/* PEDIDO ORIGINAL */}
                       <td className="px-4 py-3">
                         {w.service_order ? (
                           <Link href={`/pedidos/${w.service_order.id}`}
-                            className="font-mono text-xs hover:underline" style={{ color: "#64748b" }}>
+                            className="font-mono hover:underline" style={{ fontSize: 13, color: "#64748b" }}>
                             {osLink}
                           </Link>
-                        ) : <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>}
+                        ) : <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>}
                       </td>
+
+                      {/* CLIENTE */}
                       <td className="px-4 py-3">
-                        <span className="font-medium" style={{ color: "#0f172a" }}>
-                          {w.customer_name ?? w.service_order?.customer_name ?? "—"}
+                        <span className="font-medium block" style={{ fontSize: 13, color: "#0f172a" }}>
+                          {clienteNome}
                         </span>
+                        {clienteCpf && (
+                          <span className="block mt-0.5" style={{ fontSize: 11, color: "#94a3b8" }}>
+                            {clienteCpf}
+                          </span>
+                        )}
                       </td>
+
+                      {/* PROBLEMA */}
                       <td className="px-4 py-3">
                         {w.problem
                           ? <StatusBadge status={w.problem.name} size="sm" />
-                          : <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>
+                          : <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>
                         }
                       </td>
+
+                      {/* SITUAÇÃO S/I/E */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           {WARRANTY_SITUATIONS.map((step, si) => {
@@ -404,8 +431,9 @@ export default function GarantiasPage() {
                             const isActive = si <= idx
                             return (
                               <span key={step}
-                                className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                                className="w-5 h-5 rounded-full flex items-center justify-center font-bold"
                                 style={{
+                                  fontSize: 10,
                                   background: isActive
                                     ? (si === 0 ? "#3b82f6" : si === 1 ? "#f59e0b" : "#16a34a")
                                     : "#e2e8f0",
@@ -417,24 +445,36 @@ export default function GarantiasPage() {
                           })}
                         </div>
                       </td>
+
+                      {/* LOJA */}
                       <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                          style={{ background: "#dbeafe", color: "#1d4ed8" }}>
-                          {w.store?.code ?? "—"}
-                        </span>
+                        {w.store?.code
+                          ? <span className="px-2 py-0.5 rounded-full font-semibold"
+                              style={{ fontSize: 12, background: "#dbeafe", color: "#1d4ed8" }}>
+                              {w.store.code}
+                            </span>
+                          : <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>
+                        }
                       </td>
-                      <td className="px-4 py-3 text-xs" style={{ color: "#64748b" }}>{abertura}</td>
+
+                      {/* ABERTURA */}
+                      <td className="px-4 py-3" style={{ fontSize: 13, color: "#64748b" }}>{abertura}</td>
+
+                      {/* PRAZO */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {ok
-                            ? <Clock className="w-3.5 h-3.5" style={{ color: "#3b82f6" }} />
-                            : <AlertTriangle className="w-3.5 h-3.5" style={{ color: "#dc2626" }} />
-                          }
-                          <span className="text-xs"
-                            style={{ color: ok ? "#475569" : "#dc2626", fontWeight: ok ? 400 : 600 }}>
-                            {prazoV}
-                          </span>
-                        </div>
+                        {prazoRaw ? (
+                          <div className="flex items-center gap-1.5">
+                            {ok
+                              ? <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#3b82f6" }} />
+                              : <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#dc2626" }} />
+                            }
+                            <span style={{ fontSize: 13, color: ok ? "#475569" : "#dc2626", fontWeight: ok ? 400 : 600 }}>
+                              {prazoV}
+                            </span>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
