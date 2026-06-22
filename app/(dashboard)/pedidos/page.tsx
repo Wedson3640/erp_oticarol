@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge"
 import {
   Plus, Barcode, Search, Filter, Pencil, Trash2,
   AlertTriangle, Clock, CheckCircle2, ArrowUpDown, X,
+  Loader2,
   // Eye removido — não usado na tabela atual
 } from "lucide-react"
 import { Tooltip } from "@/components/ui/Tooltip"
@@ -87,6 +88,10 @@ export default function PedidosPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage,     setPerPage]     = useState(25)
 
+  // ── Confirmação de exclusão
+  const [deleteTarget, setDeleteTarget] = useState<OrderRow | null>(null)
+  const [deleting,     setDeleting]     = useState(false)
+
   // ── Busca de cliente com autocomplete
   const [clientSearch,   setClientSearch]   = useState("")
   const [clientHints,    setClientHints]    = useState<ClientHint[]>([])
@@ -162,6 +167,23 @@ export default function PedidosPage() {
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthFilter, statusFilter, labFilter, storeFilter, selectedClient?.id, currentPage, perPage])
+
+  // ─── Soft-delete do pedido ──────────────────────────────────────────────────
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    const sb = createSupabaseBrowserClient()
+    await sb
+      .from("service_orders")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", deleteTarget.id)
+    setDeleting(false)
+    setDeleteTarget(null)
+    // Remove da lista local imediatamente (sem re-fetch)
+    setOrders(prev => prev.filter(o => o.id !== deleteTarget.id))
+    setTotal(prev => prev - 1)
+  }
 
   // ─── Fecha dropdown ao clicar fora ──────────────────────────────────────────
 
@@ -566,6 +588,7 @@ export default function PedidosPage() {
                               <motion.button whileHover={{ scale: 1.15 }}
                                 className="p-1.5 rounded-lg transition-colors"
                                 style={{ color: "#94a3b8" }}
+                                onClick={() => setDeleteTarget(o)}
                                 onMouseEnter={e => {
                                   e.currentTarget.style.background = "#fee2e2"
                                   e.currentTarget.style.color = "#dc2626"
@@ -631,6 +654,95 @@ export default function PedidosPage() {
         </motion.div>
       </main>
 
+      {/* ── Modal de confirmação de exclusão ─────────────────────────────── */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-40"
+              style={{ background: "rgba(15,23,42,0.55)", backdropFilter: "blur(2px)" }}
+              onClick={() => !deleting && setDeleteTarget(null)}
+            />
+
+            {/* Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1,    y: 0  }}
+              exit={{   opacity: 0, scale: 0.92, y: 12  }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              className="fixed z-50 rounded-2xl shadow-2xl"
+              style={{
+                top: "50%", left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: 420,
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                padding: 28,
+              }}
+            >
+              {/* Ícone de aviso */}
+              <div className="flex items-center justify-center w-12 h-12 rounded-full mx-auto mb-4"
+                style={{ background: "#fee2e2" }}>
+                <Trash2 style={{ width: 22, height: 22, color: "#dc2626" }} />
+              </div>
+
+              <h2 className="text-center font-bold text-lg mb-1" style={{ color: "#0f172a" }}>
+                Excluir pedido?
+              </h2>
+              <p className="text-center text-sm mb-4" style={{ color: "#64748b" }}>
+                Esta ação não pode ser desfeita.
+              </p>
+
+              {/* Info do pedido */}
+              <div className="rounded-xl p-3 mb-5 text-sm"
+                style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                <div className="flex justify-between mb-1">
+                  <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Pedido</span>
+                  <span className="font-mono font-bold" style={{ color: "#1d4ed8" }}>
+                    {fmtOs(deleteTarget.os_number, deleteTarget.os_sequence)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Cliente</span>
+                  <span className="font-medium" style={{ color: "#0f172a" }}>
+                    {deleteTarget.customer_name ?? "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Botões */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-50"
+                  style={{ borderColor: "#e2e8f0", color: "#475569" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  Cancelar
+                </button>
+                <motion.button
+                  whileHover={{ scale: deleting ? 1 : 1.02 }}
+                  whileTap={{  scale: deleting ? 1 : 0.97 }}
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-70"
+                  style={{ background: "#dc2626" }}
+                >
+                  {deleting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Excluindo…</>
+                    : <><Trash2  className="w-4 h-4" /> Confirmar exclusão</>
+                  }
+                </motion.button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }
