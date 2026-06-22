@@ -4,7 +4,7 @@ import type { CookieMethodsServer } from "@supabase/ssr"
 
 const PUBLIC_PATHS = ["/login", "/"]
 
-export async function proxy(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   // Explicitamente tipado como CookieMethodsServer para resolver o overload correto.
