@@ -103,7 +103,7 @@ export default function GarantiasPage() {
         .select(
           `id, situation, customer_name, customer_cpf, request_date, scheduled_delivery,
            store:stores!store_id(id,code,name),
-           problem:warranty_problems!fk_warranties_problem_id(id,name),
+           problem:warranty_problems!problem_id(id,name),
            service_order:service_orders!service_order_id(id,os_number,os_sequence,customer_name,customer_cpf,purchase_date,scheduled_delivery)`,
           { count: "exact" },
         )
