@@ -19,11 +19,13 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Backfill customer_name a partir do service_order vinculado
+-- 2. Backfill customer_name + cpf a partir do service_order vinculado
+--    service_orders não tem customer_cpf — busca via customers
 UPDATE sascarol.warranties w
 SET   customer_name = so.customer_name,
-      customer_cpf  = so.customer_cpf
+      customer_cpf  = c.cpf
 FROM  sascarol.service_orders so
+LEFT  JOIN sascarol.customers c ON c.id = so.customer_id
 WHERE w.service_order_id = so.id
   AND w.customer_name IS NULL
   AND so.customer_name IS NOT NULL;
