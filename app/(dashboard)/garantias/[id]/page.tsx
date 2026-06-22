@@ -8,22 +8,51 @@ import { SlaCard } from "@/components/ui/SlaCard"
 import {
   ArrowLeft, ChevronDown, ExternalLink,
   Clock, CheckCircle2, AlertCircle, Wrench, Loader2,
+  Package, FlaskConical, Search, Truck, Store, ThumbsUp,
 } from "lucide-react"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { fmtDate, fmtDateTime, fmtOs, type Warranty, type WarrantyHistory } from "@/lib/types"
 
 // ─── Ícones / cores da timeline ───────────────────────────────────────────────
+// Cobre as 3 situações macro + as 11 situações granulares do PHP ETL
 
 const timelineIcon: Record<string, React.ReactNode> = {
-  "Início":        <Clock        className="w-4 h-4" />,
-  "Intermediário": <Wrench       className="w-4 h-4" />,
-  "Encerrado":     <CheckCircle2 className="w-4 h-4" />,
+  // Macro (movimentação manual no ERP novo)
+  "Início":                   <Clock        className="w-4 h-4" />,
+  "Intermediário":             <Wrench       className="w-4 h-4" />,
+  "Encerrado":                 <CheckCircle2 className="w-4 h-4" />,
+  // Granulares do PHP (TB_Warranty_Situations)
+  "Solicitação Criada":        <Clock        className="w-4 h-4" />,
+  "Em Análise":                <Search       className="w-4 h-4" />,
+  "Aprovada":                  <ThumbsUp     className="w-4 h-4" />,
+  "Rejeitada":                 <AlertCircle  className="w-4 h-4" />,
+  "Recebido na logística":     <Package      className="w-4 h-4" />,
+  "Enviado ao laboratório":    <Truck        className="w-4 h-4" />,
+  "Recebido no laboratório":   <FlaskConical className="w-4 h-4" />,
+  "Controle de qualidade":     <Wrench       className="w-4 h-4" />,
+  "Aguardando retirada":       <Clock        className="w-4 h-4" />,
+  "Recebido em loja":          <Store        className="w-4 h-4" />,
+  "Entregue ao cliente":       <CheckCircle2 className="w-4 h-4" />,
 }
+
 const timelineColor: Record<string, string> = {
-  "Início":        "#3b82f6",
-  "Intermediário": "#f59e0b",
-  "Encerrado":     "#22c55e",
+  // Macro
+  "Início":                   "#3b82f6",
+  "Intermediário":             "#f59e0b",
+  "Encerrado":                 "#22c55e",
+  // Granulares
+  "Solicitação Criada":        "#3b82f6",
+  "Em Análise":                "#f59e0b",
+  "Aprovada":                  "#22c55e",
+  "Rejeitada":                 "#ef4444",
+  "Recebido na logística":     "#64748b",
+  "Enviado ao laboratório":    "#8b5cf6",
+  "Recebido no laboratório":   "#6366f1",
+  "Controle de qualidade":     "#f59e0b",
+  "Aguardando retirada":       "#0ea5e9",
+  "Recebido em loja":          "#1d4ed8",
+  "Entregue ao cliente":       "#16a34a",
 }
 
 const FLUXO = [

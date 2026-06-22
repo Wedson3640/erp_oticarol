@@ -50,12 +50,20 @@ const statusMap: Record<string, { bg: string; text: string; border: string }> = 
 
   // ── Solicitações — situações reais do PHP (casing diferente de pedidos) ─
   "Solicitação Criada":         { bg: "#DBEAFE", text: "#1E40AF", border: "#BFDBFE" },
-  "Análise de recebimento":     { bg: "#F3E8FF", text: "#6D28D9", border: "#E9D5FF" },
-  "Recebido no laboratório":    { bg: "#EDE9FE", text: "#5B21B6", border: "#DDD6FE" },
   "Controle de qualidade":      { bg: "#DBEAFE", text: "#1E40AF", border: "#BFDBFE" },
   "Recebido na loja":           { bg: "#D1FAE5", text: "#065F46", border: "#A7F3D0" },
   "Entregue ao cliente":        { bg: "#DCFCE7", text: "#14532D", border: "#BBF7D0" },
   "Fechado pelo administrador": { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA" },
+
+  // ── Garantias — situações granulares do PHP (TB_Warranty_Situations) ─────
+  // "Solicitação Criada" → já definido acima
+  // "Enviado ao laboratório" / "Recebido no laboratório" → já definidos na seção Laboratório
+  "Em Análise":          { bg: "#FEF3C7", text: "#92400E", border: "#FDE68A" },
+  "Aprovada":            { bg: "#DCFCE7", text: "#14532D", border: "#BBF7D0" },
+  "Rejeitada":           { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA" },
+  "Recebido na logística":{ bg: "#CFFAFE", text: "#155E75", border: "#A5F3FC" },
+  "Aguardando retirada": { bg: "#D1FAE5", text: "#065F46", border: "#A7F3D0" },
+  "Recebido em loja":    { bg: "#D1FAE5", text: "#065F46", border: "#A7F3D0" },
 
   // ── Status numéricos desconhecidos ─────────────────────────────────────
   "Status 15":                   { bg: "#F1F5F9", text: "#475569", border: "#E2E8F0" },

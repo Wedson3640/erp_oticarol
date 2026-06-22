@@ -143,6 +143,8 @@ export interface WarrantyHistory {
   operator_name: string | null
   employee_id:   number | null
   notes:         string | null
+  source:        'php' | 'manual' | null
+  source_id:     string | null
   created_at:    string
 }
 
