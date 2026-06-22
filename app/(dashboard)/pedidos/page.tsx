@@ -9,6 +9,7 @@ import {
   AlertTriangle, Clock, CheckCircle2, ArrowUpDown, X,
   // Eye removido — não usado na tabela atual
 } from "lucide-react"
+import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { fmtDate, fmtOs, prazoOk } from "@/lib/types"
@@ -550,28 +551,32 @@ export default function PedidosPage() {
                         {/* AÇÕES */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
-                            <Link href={`/pedidos/${o.id}`}>
-                              <motion.span whileHover={{ scale: 1.15 }}
-                                className="p-1.5 rounded-lg transition-colors cursor-pointer"
+                            <Tooltip label="Ver pedido">
+                              <Link href={`/pedidos/${o.id}`}>
+                                <motion.span whileHover={{ scale: 1.15 }}
+                                  className="p-1.5 rounded-lg transition-colors cursor-pointer"
+                                  style={{ color: "#94a3b8" }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
+                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                  <Pencil style={{ width: 14, height: 14 }} />
+                                </motion.span>
+                              </Link>
+                            </Tooltip>
+                            <Tooltip label="Excluir">
+                              <motion.button whileHover={{ scale: 1.15 }}
+                                className="p-1.5 rounded-lg transition-colors"
                                 style={{ color: "#94a3b8" }}
-                                onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
-                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                <Pencil style={{ width: 14, height: 14 }} />
-                              </motion.span>
-                            </Link>
-                            <motion.button whileHover={{ scale: 1.15 }}
-                              className="p-1.5 rounded-lg transition-colors"
-                              style={{ color: "#94a3b8" }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.background = "#fee2e2"
-                                e.currentTarget.style.color = "#dc2626"
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.background = "transparent"
-                                e.currentTarget.style.color = "#94a3b8"
-                              }}>
-                              <Trash2 style={{ width: 14, height: 14 }} />
-                            </motion.button>
+                                onMouseEnter={e => {
+                                  e.currentTarget.style.background = "#fee2e2"
+                                  e.currentTarget.style.color = "#dc2626"
+                                }}
+                                onMouseLeave={e => {
+                                  e.currentTarget.style.background = "transparent"
+                                  e.currentTarget.style.color = "#94a3b8"
+                                }}>
+                                <Trash2 style={{ width: 14, height: 14 }} />
+                              </motion.button>
+                            </Tooltip>
                           </div>
                         </td>
                       </motion.tr>

@@ -8,6 +8,7 @@ import {
   Plus, Search, Filter, Eye, FileText,
   AlertTriangle, Clock, X,
 } from "lucide-react"
+import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { fmtDate, prazoOk } from "@/lib/types"
@@ -365,20 +366,24 @@ export default function SolicitacoesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <Link href={`/solicitacoes/${r.id}`}>
+                          <Tooltip label="Ver detalhes">
+                            <Link href={`/solicitacoes/${r.id}`}>
+                              <motion.span whileHover={{ scale: 1.15 }}
+                                className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
+                                onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
+                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                <Eye style={{ width: 14, height: 14 }} />
+                              </motion.span>
+                            </Link>
+                          </Tooltip>
+                          <Tooltip label="Relatório">
                             <motion.span whileHover={{ scale: 1.15 }}
                               className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
                               onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
                               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                              <Eye style={{ width: 14, height: 14 }} />
+                              <FileText style={{ width: 14, height: 14 }} />
                             </motion.span>
-                          </Link>
-                          <motion.span whileHover={{ scale: 1.15 }}
-                            className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                            <FileText style={{ width: 14, height: 14 }} />
-                          </motion.span>
+                          </Tooltip>
                         </div>
                       </td>
                     </motion.tr>

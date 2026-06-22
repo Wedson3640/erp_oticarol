@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import { Plus, Search, Filter, ChevronDown, Eye, MessageCircle } from "lucide-react"
 import Link from "next/link"
+import { Tooltip } from "@/components/ui/Tooltip"
 
 const conversas = [
   { id: 1,  cliente: "Maria Aparecida Sousa",   tel: "(86) 9 9111-2222", canal: "WhatsApp", interesse: "RX",      situacao: "Em Atendimento",     consultor: "Ana Souza",    loja: "488",  ultima: "Hoje, 10:30",  valor: null    },
@@ -160,16 +161,18 @@ export default function ConversasPage() {
                   </td>
                   <td className="px-4 py-3 text-xs" style={{ color: "#64748b" }}>{c.ultima}</td>
                   <td className="px-4 py-3">
-                    <Link href={`/conversas/${c.id}`}>
-                      <motion.span whileHover={{ scale: 1.15 }}
-                        className="p-1.5 rounded-lg cursor-pointer"
-                        style={{ color: "#94a3b8" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                      >
-                        <Eye style={{ width: 14, height: 14 }} />
-                      </motion.span>
-                    </Link>
+                    <Tooltip label="Ver conversa">
+                      <Link href={`/conversas/${c.id}`}>
+                        <motion.span whileHover={{ scale: 1.15 }}
+                          className="p-1.5 rounded-lg cursor-pointer"
+                          style={{ color: "#94a3b8" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <Eye style={{ width: 14, height: 14 }} />
+                        </motion.span>
+                      </Link>
+                    </Tooltip>
                   </td>
                 </motion.tr>
               ))}

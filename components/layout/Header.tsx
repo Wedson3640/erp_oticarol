@@ -1,8 +1,8 @@
 "use client"
 
 import { Bell, ChevronDown } from "lucide-react"
-import Link from "next/link"
 import { initials } from "@/lib/utils"
+import { Tooltip } from "@/components/ui/Tooltip"
 
 interface HeaderProps {
   breadcrumbs: string[]
@@ -47,20 +47,22 @@ export function Header({ breadcrumbs, title }: HeaderProps) {
       {/* Ações */}
       <div className="flex items-center gap-3">
         {/* Notificações */}
-        <button
-          className="relative p-2 rounded-xl transition-colors"
-          style={{ background: "#EAF2FF" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#DBEAFE")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#EAF2FF")}
-        >
-          <Bell style={{ width: 18, height: 18, color: "#0F5BFF" }} />
-          <span
-            className="absolute top-1 right-1 w-4 h-4 rounded-full text-white flex items-center justify-center font-bold"
-            style={{ background: "#EF4444", fontSize: 9 }}
+        <Tooltip label="Notificações">
+          <button
+            className="relative p-2 rounded-xl transition-colors"
+            style={{ background: "#EAF2FF" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#DBEAFE")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#EAF2FF")}
           >
-            8
-          </span>
-        </button>
+            <Bell style={{ width: 18, height: 18, color: "#0F5BFF" }} />
+            <span
+              className="absolute top-1 right-1 w-4 h-4 rounded-full text-white flex items-center justify-center font-bold"
+              style={{ background: "#EF4444", fontSize: 9 }}
+            >
+              8
+            </span>
+          </button>
+        </Tooltip>
 
         {/* Avatar dropdown */}
         <div

@@ -7,6 +7,7 @@ import {
   fmtDate, fmtDateTime, fmtOs, fmtPhone, fmtCpf,
   type ServiceOrder, type ServiceOrderHistory,
 } from "@/lib/types"
+import { EMPRESA } from "@/lib/empresa"
 
 // Página de impressão — sem Header/Sidebar, formato A4
 // Abre via window.open('/imprimir/pedidos/[id]', '_blank')
@@ -182,13 +183,13 @@ export default function ImprimirPedidoPage({
         {/* ── Cabeçalho Ótica Carol ───────────────────────────────────── */}
         <div className="hdr">
           <div>
-            <div className="hdr-nome">ÓTICA CAROL</div>
-            <div className="hdr-sub">Qualidade e Cuidado com sua Visão</div>
+            <div className="hdr-nome">{EMPRESA.nome}</div>
+            <div className="hdr-sub">{EMPRESA.slogan}</div>
           </div>
           <div className="hdr-info">
-            <div><strong>Teresina — Piauí</strong></div>
-            <div>CNPJ: 00.000.000/0001-00</div>
-            <div>Tel: (86) 0000-0000</div>
+            <div><strong>{EMPRESA.cidade}</strong></div>
+            <div>CNPJ: {EMPRESA.cnpj}</div>
+            <div>Tel: {EMPRESA.telefone}</div>
             <div style={{ marginTop: 4 }}>Emitido em: {fmtDateTime(new Date().toISOString())}</div>
           </div>
         </div>

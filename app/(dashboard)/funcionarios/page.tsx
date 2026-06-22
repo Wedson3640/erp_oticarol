@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import { Plus, Search, Filter, Eye, Pencil, Trash2, X } from "lucide-react"
+import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
 import { initials } from "@/lib/utils"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -321,26 +322,32 @@ export default function FuncionariosPage() {
                         {/* Ações */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
-                            <Link href={`/funcionarios/${f.id}`}>
+                            <Tooltip label="Ver perfil">
+                              <Link href={`/funcionarios/${f.id}`}>
+                                <motion.span whileHover={{ scale: 1.15 }}
+                                  className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
+                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                  <Eye style={{ width: 14, height: 14 }} />
+                                </motion.span>
+                              </Link>
+                            </Tooltip>
+                            <Tooltip label="Editar">
                               <motion.span whileHover={{ scale: 1.15 }}
                                 className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
                                 onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
                                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                <Eye style={{ width: 14, height: 14 }} />
+                                <Pencil style={{ width: 14, height: 14 }} />
                               </motion.span>
-                            </Link>
-                            <motion.span whileHover={{ scale: 1.15 }}
-                              className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
-                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                              <Pencil style={{ width: 14, height: 14 }} />
-                            </motion.span>
-                            <motion.button whileHover={{ scale: 1.15 }}
-                              className="p-1.5 rounded-lg" style={{ color: "#94a3b8" }}
-                              onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.color = "#dc2626" }}
-                              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}>
-                              <Trash2 style={{ width: 14, height: 14 }} />
-                            </motion.button>
+                            </Tooltip>
+                            <Tooltip label="Desativar">
+                              <motion.button whileHover={{ scale: 1.15 }}
+                                className="p-1.5 rounded-lg" style={{ color: "#94a3b8" }}
+                                onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.color = "#dc2626" }}
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}>
+                                <Trash2 style={{ width: 14, height: 14 }} />
+                              </motion.button>
+                            </Tooltip>
                           </div>
                         </td>
                       </motion.tr>

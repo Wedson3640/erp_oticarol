@@ -8,6 +8,7 @@ import {
   Plus, Search, Filter, Eye, Pencil,
   AlertTriangle, Clock, X,
 } from "lucide-react"
+import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { fmtDate, prazoOk } from "@/lib/types"
@@ -437,20 +438,24 @@ export default function GarantiasPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <Link href={`/garantias/${w.id}`}>
+                          <Tooltip label="Ver detalhes">
+                            <Link href={`/garantias/${w.id}`}>
+                              <motion.span whileHover={{ scale: 1.15 }}
+                                className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
+                                onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
+                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                <Eye style={{ width: 14, height: 14 }} />
+                              </motion.span>
+                            </Link>
+                          </Tooltip>
+                          <Tooltip label="Editar">
                             <motion.span whileHover={{ scale: 1.15 }}
                               className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
                               onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
                               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                              <Eye style={{ width: 14, height: 14 }} />
+                              <Pencil style={{ width: 14, height: 14 }} />
                             </motion.span>
-                          </Link>
-                          <motion.span whileHover={{ scale: 1.15 }}
-                            className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                            <Pencil style={{ width: 14, height: 14 }} />
-                          </motion.span>
+                          </Tooltip>
                         </div>
                       </td>
                     </motion.tr>

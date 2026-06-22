@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import { Plus, Search, Pencil, Key, Trash2, X, Check, ChevronDown, Info } from "lucide-react"
+import { Tooltip } from "@/components/ui/Tooltip"
 import { initials } from "@/lib/utils"
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -563,33 +564,35 @@ export default function UsuariosPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      {/* Editar */}
-                      <motion.button whileHover={{ scale: 1.15 }}
-                        className="p-1.5 rounded-lg transition-colors" style={{ color: "#94a3b8" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; e.currentTarget.style.color = "#64748b" }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}
-                      >
-                        <Pencil style={{ width: 14, height: 14 }} />
-                      </motion.button>
-                      {/* Reset senha */}
-                      <motion.button
-                        whileHover={{ scale: 1.15 }}
-                        onClick={() => setResetUsername(u.username)}
-                        className="p-1.5 rounded-lg transition-colors" style={{ color: "#94a3b8" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "#fef3c7"; e.currentTarget.style.color = "#d97706" }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}
-                        title="Redefinir senha"
-                      >
-                        <Key style={{ width: 14, height: 14 }} />
-                      </motion.button>
-                      {/* Excluir */}
-                      <motion.button whileHover={{ scale: 1.15 }}
-                        className="p-1.5 rounded-lg transition-colors" style={{ color: "#94a3b8" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.color = "#dc2626" }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}
-                      >
-                        <Trash2 style={{ width: 14, height: 14 }} />
-                      </motion.button>
+                      <Tooltip label="Editar">
+                        <motion.button whileHover={{ scale: 1.15 }}
+                          className="p-1.5 rounded-lg transition-colors" style={{ color: "#94a3b8" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; e.currentTarget.style.color = "#64748b" }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}
+                        >
+                          <Pencil style={{ width: 14, height: 14 }} />
+                        </motion.button>
+                      </Tooltip>
+                      <Tooltip label="Alterar senha">
+                        <motion.button
+                          whileHover={{ scale: 1.15 }}
+                          onClick={() => setResetUsername(u.username)}
+                          className="p-1.5 rounded-lg transition-colors" style={{ color: "#94a3b8" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#fef3c7"; e.currentTarget.style.color = "#d97706" }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}
+                        >
+                          <Key style={{ width: 14, height: 14 }} />
+                        </motion.button>
+                      </Tooltip>
+                      <Tooltip label="Desativar">
+                        <motion.button whileHover={{ scale: 1.15 }}
+                          className="p-1.5 rounded-lg transition-colors" style={{ color: "#94a3b8" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.color = "#dc2626" }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}
+                        >
+                          <Trash2 style={{ width: 14, height: 14 }} />
+                        </motion.button>
+                      </Tooltip>
                     </div>
                   </td>
                 </motion.tr>
