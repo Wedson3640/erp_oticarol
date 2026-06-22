@@ -33,7 +33,6 @@ interface WarrantyRow {
     os_number: string
     os_sequence: string | null
     customer_name: string | null
-    customer_cpf:  string | null
     purchase_date: string | null
     scheduled_delivery: string | null
   } | null
@@ -104,7 +103,7 @@ export default function GarantiasPage() {
           `id, situation, customer_name, customer_cpf, request_date, scheduled_delivery,
            store:stores!store_id(id,code,name),
            problem:warranty_problems!problem_id(id,name),
-           service_order:service_orders!service_order_id(id,os_number,os_sequence,customer_name,customer_cpf,purchase_date,scheduled_delivery)`,
+           service_order:service_orders!service_order_id(id,os_number,os_sequence,customer_name,purchase_date,scheduled_delivery)`,
           { count: "exact" },
         )
         .is("deleted_at", null)
@@ -368,7 +367,7 @@ export default function GarantiasPage() {
                   const prazoRaw   = w.scheduled_delivery ?? w.service_order?.scheduled_delivery ?? null
                   const aberturaRaw= w.request_date       ?? w.service_order?.purchase_date      ?? null
                   const clienteNome= w.customer_name      ?? w.service_order?.customer_name      ?? "—"
-                  const clienteCpf = w.customer_cpf       ?? w.service_order?.customer_cpf       ?? null
+                  const clienteCpf = w.customer_cpf
                   const ok         = prazoOk(prazoRaw)
                   const prazoV     = fmtDate(prazoRaw)
                   const abertura   = fmtDate(aberturaRaw ?? undefined)
