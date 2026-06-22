@@ -4,10 +4,20 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- 1. FK constraint warranty_problems (necessário para o join PostgREST funcionar)
-ALTER TABLE sascarol.warranties
-  ADD CONSTRAINT IF NOT EXISTS fk_warranties_problem_id
-  FOREIGN KEY (problem_id) REFERENCES sascarol.warranty_problems(id)
-  ON DELETE SET NULL;
+--    PostgreSQL não suporta ADD CONSTRAINT IF NOT EXISTS — usa DO $$ para checar
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'fk_warranties_problem_id'
+      AND conrelid = 'sascarol.warranties'::regclass
+  ) THEN
+    ALTER TABLE sascarol.warranties
+      ADD CONSTRAINT fk_warranties_problem_id
+      FOREIGN KEY (problem_id) REFERENCES sascarol.warranty_problems(id)
+      ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- 2. Backfill customer_name a partir do service_order vinculado
 UPDATE sascarol.warranties w
@@ -40,10 +50,10 @@ WHERE w.service_order_id = so.id
 
 -- 5. Confirma resultados
 SELECT
-  COUNT(*)                                         AS total,
-  COUNT(*) FILTER (WHERE customer_name IS NOT NULL) AS com_cliente,
-  COUNT(*) FILTER (WHERE problem_id    IS NOT NULL) AS com_problema,
-  COUNT(*) FILTER (WHERE request_date  IS NOT NULL) AS com_abertura,
+  COUNT(*)                                              AS total,
+  COUNT(*) FILTER (WHERE customer_name    IS NOT NULL)  AS com_cliente,
+  COUNT(*) FILTER (WHERE problem_id       IS NOT NULL)  AS com_problema,
+  COUNT(*) FILTER (WHERE request_date     IS NOT NULL)  AS com_abertura,
   COUNT(*) FILTER (WHERE scheduled_delivery IS NOT NULL) AS com_prazo
 FROM sascarol.warranties
 WHERE deleted_at IS NULL;
