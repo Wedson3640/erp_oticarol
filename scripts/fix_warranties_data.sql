@@ -19,16 +19,17 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Backfill customer_name + cpf a partir do service_order vinculado
---    service_orders não tem customer_cpf — busca via customers
+-- 2. Backfill customer_name + cpf
+--    service_orders.customer_name pode ser nulo — mesma lógica da vw_pedidos:
+--    COALESCE(so.customer_name, c.name)
 UPDATE sascarol.warranties w
-SET   customer_name = so.customer_name,
+SET   customer_name = COALESCE(so.customer_name, c.name),
       customer_cpf  = c.cpf
 FROM  sascarol.service_orders so
 LEFT  JOIN sascarol.customers c ON c.id = so.customer_id
 WHERE w.service_order_id = so.id
   AND w.customer_name IS NULL
-  AND so.customer_name IS NOT NULL;
+  AND COALESCE(so.customer_name, c.name) IS NOT NULL;
 
 -- 3. Backfill request_date para garantias Rails sem data
 --    (usa a purchase_date do pedido pai como referência)
