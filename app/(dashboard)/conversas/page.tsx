@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { motion } from "framer-motion"
 import { Header } from "@/components/layout/Header"
@@ -81,18 +81,18 @@ export default function ConversasPage() {
           className="rounded-xl p-4 border flex items-center gap-3 flex-wrap"
           style={{ background: "#fff", borderColor: "#e2e8f0" }}
         >
-          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#94a3b8" }} />
+          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#7e8b9c" }} />
           {["Todas as situações", "Todos os canais", "Todos os interesses", "Todos os consultores"].map((label) => (
             <button key={label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border"
-              style={{ borderColor: "#e2e8f0", color: "#475569", background: "#f8fafc" }}>
+              style={{ borderColor: "#e2e8f0", color: "#3c4859", background: "#f8fafc" }}>
               {label} <ChevronDown className="w-3 h-3" />
             </button>
           ))}
           <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#7e8b9c" }} />
             <input placeholder="Buscar cliente..."
               className="w-full pl-9 pr-3 py-1.5 rounded-lg text-sm border outline-none"
-              style={{ borderColor: "#e2e8f0", color: "#0f172a", background: "#f8fafc" }} />
+              style={{ borderColor: "#e2e8f0", color: "#121212", background: "#f8fafc" }} />
           </div>
           <button className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white" style={{ background: "#1d4ed8" }}>
             Filtrar
@@ -109,7 +109,7 @@ export default function ConversasPage() {
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                 {["Cliente", "Telefone", "Canal", "Interesse", "Situação", "Consultor", "Loja", "Última Atividade", "Ações"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "#64748b" }}>
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color: "#556376" }}>
                     {h}
                   </th>
                 ))}
@@ -133,7 +133,7 @@ export default function ConversasPage() {
                   <td className="px-4 py-3">
                     <div>
                       <Link href={`/conversas/${c.id}`}
-                        className="font-semibold text-sm hover:underline" style={{ color: "#0f172a" }}>
+                        className="font-semibold text-sm hover:underline" style={{ color: "#121212" }}>
                         {c.cliente}
                       </Link>
                       {c.situacao === "Convertido" && c.valor && (
@@ -143,29 +143,29 @@ export default function ConversasPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: "#64748b" }}>{c.tel}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "#556376" }}>{c.tel}</td>
                   <td className="px-4 py-3">
-                    <MiniChip label={c.canal} colors={canalColor[c.canal] ?? { bg: "#f1f5f9", text: "#475569" }} />
+                    <MiniChip label={c.canal} colors={canalColor[c.canal] ?? { bg: "#f1f5f9", text: "#3c4859" }} />
                   </td>
                   <td className="px-4 py-3">
-                    <MiniChip label={c.interesse} colors={interesseColor[c.interesse] ?? { bg: "#f1f5f9", text: "#475569" }} />
+                    <MiniChip label={c.interesse} colors={interesseColor[c.interesse] ?? { bg: "#f1f5f9", text: "#3c4859" }} />
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={c.situacao} size="sm" />
                   </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: "#0f172a", fontWeight: 500 }}>{c.consultor}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "#121212", fontWeight: 500 }}>{c.consultor}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "#dbeafe", color: "#1d4ed8" }}>
                       {c.loja}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: "#64748b" }}>{c.ultima}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "#556376" }}>{c.ultima}</td>
                   <td className="px-4 py-3">
                     <Tooltip label="Ver conversa">
                       <Link href={`/conversas/${c.id}`}>
                         <motion.span whileHover={{ scale: 1.15 }}
                           className="p-1.5 rounded-lg cursor-pointer"
-                          style={{ color: "#94a3b8" }}
+                          style={{ color: "#7e8b9c" }}
                           onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
                           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                         >

@@ -1,17 +1,16 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import {
-  Plus, Search, Filter, Eye, FileText,
-  AlertTriangle, Clock, X,
+  Plus, Search, Filter, Pencil, Trash2, X,
 } from "lucide-react"
 import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { fmtDate, prazoOk } from "@/lib/types"
+import { fmtDate, fmtDateTime } from "@/lib/types"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -19,37 +18,28 @@ interface Store      { id: number; code: string; name: string }
 interface ClientHint { id: number; name: string; cpf: string | null }
 
 interface RequestRow {
-  id:                number
-  source_erp_id:     number | null    // ID original do PHP (sol_id)
-  customer_name:     string | null
-  service_type:      string
-  frame_type:        string | null
-  situation:         string
-  scheduled_delivery:string | null
-  created_at:        string
-  store:             { id: number; code: string; name: string } | null
+  id:                 number
+  source_erp_id:      number | null    // ID original do PHP (sol_id)
+  customer_name:      string | null
+  customer_cpf:       string | null
+  service_type:       string
+  frame_type:         string | null
+  frame_model:        string | null   // título real da armação (ex: "Fio de nylon")
+  notes:              string | null
+  situation:          string
+  scheduled_delivery: string | null
+  created_at:         string
+  store:    { id: number; code: string; name: string } | null
+  employee: { id: number; full_name: string } | null
 }
 
-const SITUACOES    = ["Aguardando", "Em andamento", "Pronto p/ Entrega", "Entregue", "Cancelado"]
-const SERVICE_TYPES = ["Adaptação", "Troca", "Manutenção", "Outros"]
-
-const servicoColor: Record<string, { bg: string; text: string }> = {
-  "Adaptação":  { bg: "#CCFBF1", text: "#134E4A" },
-  "Troca":      { bg: "#DBEAFE", text: "#1E40AF" },
-  "Manutenção": { bg: "#FEF3C7", text: "#92400E" },
-  "Outros":     { bg: "#F1F5F9", text: "#475569" },
-}
-
-function Chip({ label, colors }: { label: string; colors: { bg: string; text: string } }) {
-  return (
-    <span style={{
-      display: "inline-flex", padding: "2px 9px", borderRadius: 999,
-      fontSize: 11, fontWeight: 600, background: colors.bg, color: colors.text,
-    }}>
-      {label}
-    </span>
-  )
-}
+// Situações reais do PHP TB_Solicitation_Situations
+const SITUACOES = [
+  "Solicitação Criada", "Análise de recebimento", "Trânsito",
+  "No Laboratório", "Surfaçagem", "Controle de qualidade",
+  "Pronto p/ Entrega", "Entregue", "Cancelado",
+]
+const SERVICE_TYPES = ["Adaptação", "Troca", "Manutenção", "Outros", "Transposição", "Montagem", "Ajustes", "Copiar grau"]
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -99,10 +89,13 @@ export default function SolicitacoesPage() {
       let q: any = sb
         .from("requests")
         .select(
-          "id, source_erp_id, customer_name, service_type, frame_type, situation, scheduled_delivery, created_at, store:stores(id,code,name)",
+          `id, source_erp_id, customer_name, customer_cpf,
+           service_type, frame_type, frame_model, notes, situation, scheduled_delivery, created_at,
+           store:stores(id,code,name),
+           employee:employees(id,full_name)`,
           { count: "exact" },
         )
-        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
 
       if (situacaoFilter) q = q.eq("situation",    situacaoFilter)
       if (servicoFilter)  q = q.eq("service_type", servicoFilter)
@@ -112,7 +105,8 @@ export default function SolicitacoesPage() {
       const from = (currentPage - 1) * perPage
       q = q.range(from, from + perPage - 1)
 
-      const { data, count } = await q
+      const { data, count, error } = await q
+      if (error) console.error("[solicitacoes] Supabase error:", error)
       setRequests((data ?? []) as RequestRow[])
       setTotal(count ?? 0)
       setLoadingRequests(false)
@@ -177,9 +171,10 @@ export default function SolicitacoesPage() {
 
   const emAberto = requests.filter(r => r.situation !== "Entregue" && r.situation !== "Cancelado").length
 
+
   const selCls = "appearance-none pl-3 pr-8 py-1.5 rounded-lg text-sm border outline-none transition-colors cursor-pointer"
   const selStyle = {
-    borderColor: "#e2e8f0", color: "#475569",
+    borderColor: "#e2e8f0", color: "#3c4859",
     background: "#f8fafc url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\") no-repeat right 8px center",
   }
 
@@ -210,7 +205,7 @@ export default function SolicitacoesPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
           className="rounded-xl p-4 border flex items-center gap-3 flex-wrap"
           style={{ background: "#fff", borderColor: "#e2e8f0" }}>
-          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#94a3b8" }} />
+          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#7e8b9c" }} />
 
           <select value={situacaoFilter}
             onChange={e => { setSituacaoFilter(e.target.value); setCurrentPage(1) }}
@@ -236,13 +231,13 @@ export default function SolicitacoesPage() {
 
           {/* Busca cliente */}
           <div ref={searchRef} className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#7e8b9c" }} />
             <input value={clientSearch}
               onChange={e => { setClientSearch(e.target.value); setSelectedClient(null) }}
               onFocus={() => clientHints.length > 0 && setShowHints(true)}
               placeholder="Buscar cliente..."
               className="w-full pl-9 pr-8 py-1.5 rounded-lg text-sm border outline-none transition-colors"
-              style={{ borderColor: "#e2e8f0", color: "#0f172a", background: "#f8fafc" }}
+              style={{ borderColor: "#e2e8f0", color: "#121212", background: "#f8fafc" }}
               onFocusCapture={e => (e.target.style.borderColor = "#1d4ed8")}
               onBlurCapture={e  => (e.target.style.borderColor = "#e2e8f0")}
             />
@@ -252,7 +247,7 @@ export default function SolicitacoesPage() {
               </div>
             )}
             {selectedClient && !searching && (
-              <button onClick={clearClientSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: "#94a3b8" }}>
+              <button onClick={clearClientSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: "#7e8b9c" }}>
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -267,8 +262,8 @@ export default function SolicitacoesPage() {
                   {clientHints.map(c => (
                     <button key={c.id} onClick={() => selectClient(c)}
                       className="w-full text-left px-4 py-2.5 transition-colors hover:bg-blue-50">
-                      <p className="text-sm font-medium" style={{ color: "#0f172a" }}>{c.name}</p>
-                      {c.cpf && <p className="text-xs" style={{ color: "#94a3b8" }}>{c.cpf}</p>}
+                      <p className="text-sm font-medium" style={{ color: "#121212" }}>{c.name}</p>
+                      {c.cpf && <p className="text-xs" style={{ color: "#7e8b9c" }}>{c.cpf}</p>}
                     </button>
                   ))}
                 </motion.div>
@@ -278,9 +273,9 @@ export default function SolicitacoesPage() {
 
           <button
             onClick={() => { setSituacaoFilter(""); setServicoFilter(""); setLojaFilter(""); clearClientSearch(); setCurrentPage(1) }}
-            className="text-sm transition-colors" style={{ color: "#94a3b8" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#475569")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#94a3b8")}
+            className="text-sm transition-colors" style={{ color: "#7e8b9c" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#3c4859")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#7e8b9c")}
           >Limpar</button>
         </motion.div>
 
@@ -291,9 +286,9 @@ export default function SolicitacoesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                {["# Sol.", "Cliente", "Serviço", "Armação", "Situação", "Loja", "Prazo", "Ações"].map(h => (
+                {["ID", "Cliente", "Serviço/Armação", "Vendedor(a)", "Entrega", "Status", "Ações"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: "#64748b" }}>{h}
+                    style={{ color: "#556376" }}>{h}
                   </th>
                 ))}
               </tr>
@@ -302,7 +297,7 @@ export default function SolicitacoesPage() {
               {loadingRequests ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b" style={{ borderColor: "#f1f5f9" }}>
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 rounded animate-pulse" style={{ background: "#f1f5f9", width: "70%" }} />
                       </td>
@@ -311,14 +306,18 @@ export default function SolicitacoesPage() {
                 ))
               ) : requests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: "#94a3b8" }}>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm" style={{ color: "#7e8b9c" }}>
                     Nenhuma solicitação encontrada.
                   </td>
                 </tr>
               ) : (
                 requests.map((r, i) => {
-                  const ok    = prazoOk(r.scheduled_delivery)
-                  const prazo = fmtDate(r.scheduled_delivery)
+                  const loja    = r.store ? `${r.store.code} · ${r.store.name}` : null
+                  // Exibe apenas primeiro nome + sobrenome (primeiras 2 palavras)
+                  const nomeCompleto = r.employee?.full_name ?? null
+                  const vendedor = nomeCompleto
+                    ? nomeCompleto.trim().split(/\s+/).slice(0, 2).join(" ")
+                    : null
                   return (
                     <motion.tr key={r.id}
                       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -328,60 +327,88 @@ export default function SolicitacoesPage() {
                       onMouseEnter={e => (e.currentTarget.style.background = "#f8faff")}
                       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                     >
+                      {/* ID */}
                       <td className="px-4 py-3">
                         <Link href={`/solicitacoes/${r.id}`}
-                          className="font-mono font-bold text-xs hover:underline" style={{ color: "#1d4ed8" }}>
-                          SOL-{String(r.source_erp_id ?? r.id).padStart(3, "0")}
+                          className="font-mono font-bold hover:underline"
+                          style={{ fontSize: 14, color: "#1d4ed8" }}>
+                          {r.source_erp_id ?? r.id}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 font-medium" style={{ color: "#0f172a" }}>
-                        {r.customer_name ?? "—"}
-                      </td>
+
+                      {/* CLIENTE */}
                       <td className="px-4 py-3">
-                        <Chip label={r.service_type} colors={servicoColor[r.service_type] ?? { bg: "#f1f5f9", text: "#475569" }} />
+                        <span className="font-medium block" style={{ fontSize: 14, color: "#121212" }}>
+                          {r.customer_name?.trim() || "—"}
+                        </span>
+                        {r.customer_cpf && (
+                          <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>
+                            {r.customer_cpf}
+                          </span>
+                        )}
                       </td>
+
+                      {/* SERVIÇO / ARMAÇÃO */}
                       <td className="px-4 py-3">
-                        {r.frame_type
-                          ? <Chip label={r.frame_type} colors={{ bg: "#EDE9FE", text: "#4C1D95" }} />
-                          : <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>
-                        }
+                        <span className="block" style={{ fontSize: 14, color: "#121212" }}>{r.service_type}</span>
+                        {/* frame_model tem o título real do PHP (ex: "Fio de nylon", "Plástico") */}
+                        {(r.frame_model ?? r.frame_type) && (
+                          <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>
+                            {r.frame_model ?? r.frame_type}
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3"><StatusBadge status={r.situation} size="sm" /></td>
+
+                      {/* VENDEDOR(A) */}
                       <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                          style={{ background: "#dbeafe", color: "#1d4ed8" }}>
-                          {r.store?.code ?? "—"}
+                        {vendedor ? (
+                          <>
+                            <span className="font-medium block" style={{ fontSize: 14, color: "#121212" }}>{vendedor}</span>
+                            {loja && (
+                              <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>{loja}</span>
+                            )}
+                          </>
+                        ) : loja ? (
+                          <span style={{ fontSize: 14, color: "#556376" }}>{loja}</span>
+                        ) : (
+                          <span style={{ fontSize: 14, color: "#7e8b9c" }}>—</span>
+                        )}
+                      </td>
+
+                      {/* ENTREGA */}
+                      <td className="px-4 py-3">
+                        <span style={{ fontSize: 14, color: "#3c4859" }}>
+                          {fmtDate(r.scheduled_delivery)}
                         </span>
                       </td>
+
+                      {/* STATUS */}
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {ok
-                            ? <Clock className="w-3.5 h-3.5" style={{ color: "#3b82f6" }} />
-                            : <AlertTriangle className="w-3.5 h-3.5" style={{ color: "#dc2626" }} />
-                          }
-                          <span className="text-xs" style={{ color: ok ? "#475569" : "#dc2626", fontWeight: ok ? 400 : 600 }}>
-                            {prazo}
-                          </span>
-                        </div>
+                        <StatusBadge status={r.situation} size="sm" />
+                        <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>
+                          {fmtDateTime(r.created_at)}
+                        </span>
                       </td>
+
+                      {/* AÇÕES */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <Tooltip label="Ver detalhes">
+                          <Tooltip label="Editar">
                             <Link href={`/solicitacoes/${r.id}`}>
                               <motion.span whileHover={{ scale: 1.15 }}
-                                className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
+                                className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#7e8b9c" }}
                                 onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
                                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                <Eye style={{ width: 14, height: 14 }} />
+                                <Pencil style={{ width: 14, height: 14 }} />
                               </motion.span>
                             </Link>
                           </Tooltip>
-                          <Tooltip label="Relatório">
+                          <Tooltip label="Excluir">
                             <motion.span whileHover={{ scale: 1.15 }}
-                              className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
+                              className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#7e8b9c" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "#fee2e2")}
                               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                              <FileText style={{ width: 14, height: 14 }} />
+                              <Trash2 style={{ width: 14, height: 14 }} />
                             </motion.span>
                           </Tooltip>
                         </div>
@@ -395,7 +422,7 @@ export default function SolicitacoesPage() {
 
           {/* Paginação */}
           <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: "#f1f5f9" }}>
-            <div className="flex items-center gap-2 text-xs" style={{ color: "#64748b" }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: "#556376" }}>
               Mostrar
               <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
                 className="px-2 py-1 rounded border text-xs outline-none" style={{ borderColor: "#e2e8f0" }}>
@@ -408,21 +435,21 @@ export default function SolicitacoesPage() {
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>‹</button>
+                style={{ color: "#556376" }}>‹</button>
               {pageButtons().map((p, i) =>
                 p === "…" ? (
-                  <span key={`e-${i}`} className="w-8 h-8 flex items-center justify-center text-xs" style={{ color: "#94a3b8" }}>…</span>
+                  <span key={`e-${i}`} className="w-8 h-8 flex items-center justify-center text-xs" style={{ color: "#7e8b9c" }}>…</span>
                 ) : (
                   <button key={p} onClick={() => setCurrentPage(p as number)}
                     className="w-8 h-8 rounded-lg text-xs font-medium transition-colors"
-                    style={{ background: p === safePage ? "#0f2744" : "transparent", color: p === safePage ? "#fff" : "#64748b" }}>
+                    style={{ background: p === safePage ? "#0f2744" : "transparent", color: p === safePage ? "#fff" : "#556376" }}>
                     {p}
                   </button>
                 )
               )}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>›</button>
+                style={{ color: "#556376" }}>›</button>
             </div>
           </div>
         </motion.div>

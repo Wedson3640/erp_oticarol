@@ -1,12 +1,11 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import {
-  Plus, Search, Filter, Eye, Pencil,
-  AlertTriangle, Clock, X,
+  Plus, Search, Filter, Pencil, Trash2, X,
 } from "lucide-react"
 import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
@@ -20,25 +19,53 @@ interface Store           { id: number; code: string; name: string }
 interface ClientHint      { id: number; name: string; cpf: string | null }
 
 interface WarrantyRow {
-  id:                number
-  situation:         string | null
-  customer_name:     string | null
-  customer_cpf:      string | null
-  request_date:      string | null
-  scheduled_delivery:string | null
-  store:             { id: number; code: string; name: string } | null
-  problem:           { id: number; name: string } | null
-  service_order:     {
+  id:                 number
+  situation:          string | null
+  customer_name:      string | null
+  customer_cpf:       string | null
+  request_date:       string | null
+  scheduled_delivery: string | null
+  updated_at:         string | null
+  store:  { id: number; code: string; name: string } | null
+  problem:{ id: number; name: string } | null
+  service_order: {
     id: number
     os_number: string
     os_sequence: string | null
     customer_name: string | null
     purchase_date: string | null
     scheduled_delivery: string | null
+    employee: { id: number; short_name: string } | null
   } | null
 }
 
-const WARRANTY_SITUATIONS = ["Início", "Intermediário", "Encerrado"]
+// Situações granulares PHP (após backfill fix_warranties_situation.sql)
+const WARRANTY_SITUATIONS = [
+  "Solicitação Criada",
+  "Em Análise",
+  "Aprovada",
+  "Rejeitada",
+  "Recebido na logística",
+  "Enviado ao laboratório",
+  "Recebido no laboratório",
+  "Controle de qualidade",
+  "Aguardando retirada",
+  "Recebido em loja",
+  "Entregue ao cliente",
+]
+const CLOSED_SITUATIONS = ["Entregue ao cliente", "Rejeitada", "Encerrado"]
+
+// Formata ISO → "DD/MM/AAAA às HH:MM"
+function fmtDateTime(iso: string | null): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  const dd  = String(d.getDate()).padStart(2, "0")
+  const mm  = String(d.getMonth() + 1).padStart(2, "0")
+  const yyyy = d.getFullYear()
+  const hh  = String(d.getHours()).padStart(2, "0")
+  const min = String(d.getMinutes()).padStart(2, "0")
+  return `${dd}/${mm}/${yyyy} às ${hh}:${min}`
+}
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -55,6 +82,7 @@ export default function GarantiasPage() {
   const [loadingWarranties,setLoadingWarranties] = useState(false)
 
   // ── Filtros
+  const [sourceFilter,   setSourceFilter]   = useState("php")   // padrão: só PHP
   const [situacaoFilter, setSituacaoFilter] = useState("")
   const [problemaFilter, setProblemaFilter] = useState("")
   const [lojaFilter,     setLojaFilter]     = useState("")
@@ -100,18 +128,22 @@ export default function GarantiasPage() {
       let q: any = sb
         .from("warranties")
         .select(
-          `id, situation, customer_name, customer_cpf, request_date, scheduled_delivery,
+          `id, situation, customer_name, customer_cpf, request_date, scheduled_delivery, updated_at,
            store:stores!store_id(id,code,name),
            problem:warranty_problems!problem_id(id,name),
-           service_order:service_orders!service_order_id(id,os_number,os_sequence,customer_name,purchase_date,scheduled_delivery)`,
+           service_order:service_orders!service_order_id(
+             id, os_number, os_sequence, customer_name, purchase_date, scheduled_delivery,
+             employee:employees!employee_id(id,short_name)
+           )`,
           { count: "exact" },
         )
         .is("deleted_at", null)
         .order("id", { ascending: false })
 
-      if (situacaoFilter) q = q.eq("situation", situacaoFilter)
-      if (lojaFilter)     q = q.eq("store_id",  parseInt(lojaFilter))
-      if (problemaFilter) q = q.eq("problem_id", parseInt(problemaFilter))
+      if (sourceFilter)   q = q.eq("source",     sourceFilter)
+      if (situacaoFilter) q = q.eq("situation",   situacaoFilter)
+      if (lojaFilter)     q = q.eq("store_id",    parseInt(lojaFilter))
+      if (problemaFilter) q = q.eq("problem_id",  parseInt(problemaFilter))
       if (selectedClient) q = q.eq("customer_id", selectedClient.id)
 
       const from = (currentPage - 1) * perPage
@@ -125,7 +157,7 @@ export default function GarantiasPage() {
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [situacaoFilter, problemaFilter, lojaFilter, selectedClient?.id, currentPage, perPage])
+  }, [sourceFilter, situacaoFilter, problemaFilter, lojaFilter, selectedClient?.id, currentPage, perPage])
 
   // ─── Fecha dropdown ao clicar fora ──────────────────────────────────────────
 
@@ -162,8 +194,11 @@ export default function GarantiasPage() {
 
   // ─── Contadores ──────────────────────────────────────────────────────────────
 
-  const emAberto = warranties.filter(w => w.situation !== "Encerrado").length
-  const vencidas = warranties.filter(w => !prazoOk(w.scheduled_delivery) && w.situation !== "Encerrado").length
+  const emAberto = warranties.filter(w => !CLOSED_SITUATIONS.includes(w.situation ?? "")).length
+  const vencidas = warranties.filter(w =>
+    !CLOSED_SITUATIONS.includes(w.situation ?? "") &&
+    !prazoOk(w.scheduled_delivery ?? w.service_order?.scheduled_delivery ?? null),
+  ).length
 
   // ─── Paginação ───────────────────────────────────────────────────────────────
 
@@ -192,7 +227,7 @@ export default function GarantiasPage() {
 
   const selCls = "appearance-none pl-3 pr-8 py-1.5 rounded-lg text-sm border outline-none transition-colors cursor-pointer"
   const selStyle = {
-    borderColor: "#e2e8f0", color: "#475569",
+    borderColor: "#e2e8f0", color: "#3c4859",
     background: "#f8fafc url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\") no-repeat right 8px center",
   }
 
@@ -237,7 +272,19 @@ export default function GarantiasPage() {
           className="rounded-xl p-4 border flex items-center gap-3 flex-wrap"
           style={{ background: "#fff", borderColor: "#e2e8f0" }}
         >
-          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#94a3b8" }} />
+          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#7e8b9c" }} />
+
+          {/* Sistema de origem */}
+          <select value={sourceFilter}
+            onChange={e => { setSourceFilter(e.target.value); setCurrentPage(1) }}
+            className={selCls} style={selStyle}
+            onFocus={e => (e.target.style.borderColor = "#93c5fd")}
+            onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
+          >
+            <option value="php">ERP atual (PHP)</option>
+            <option value="rails">Sistema antigo</option>
+            <option value="">Todos</option>
+          </select>
 
           <select value={situacaoFilter}
             onChange={e => { setSituacaoFilter(e.target.value); setCurrentPage(1) }}
@@ -279,14 +326,14 @@ export default function GarantiasPage() {
 
           {/* Busca cliente */}
           <div ref={searchRef} className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#7e8b9c" }} />
             <input
               value={clientSearch}
               onChange={e => { setClientSearch(e.target.value); setSelectedClient(null) }}
               onFocus={() => clientHints.length > 0 && setShowHints(true)}
               placeholder="Buscar cliente..."
               className="w-full pl-9 pr-8 py-1.5 rounded-lg text-sm border outline-none transition-colors"
-              style={{ borderColor: "#e2e8f0", color: "#0f172a", background: "#f8fafc" }}
+              style={{ borderColor: "#e2e8f0", color: "#121212", background: "#f8fafc" }}
               onFocusCapture={e => (e.target.style.borderColor = "#1d4ed8")}
               onBlurCapture={e  => (e.target.style.borderColor = "#e2e8f0")}
             />
@@ -296,7 +343,7 @@ export default function GarantiasPage() {
               </div>
             )}
             {selectedClient && !searching && (
-              <button onClick={clearClientSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: "#94a3b8" }}>
+              <button onClick={clearClientSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: "#7e8b9c" }}>
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -311,8 +358,8 @@ export default function GarantiasPage() {
                   {clientHints.map(c => (
                     <button key={c.id} onClick={() => selectClient(c)}
                       className="w-full text-left px-4 py-2.5 transition-colors hover:bg-blue-50">
-                      <p className="text-sm font-medium" style={{ color: "#0f172a" }}>{c.name}</p>
-                      {c.cpf && <p className="text-xs" style={{ color: "#94a3b8" }}>{c.cpf}</p>}
+                      <p className="text-sm font-medium" style={{ color: "#121212" }}>{c.name}</p>
+                      {c.cpf && <p className="text-xs" style={{ color: "#7e8b9c" }}>{c.cpf}</p>}
                     </button>
                   ))}
                 </motion.div>
@@ -321,10 +368,10 @@ export default function GarantiasPage() {
           </div>
 
           <button
-            onClick={() => { setSituacaoFilter(""); setProblemaFilter(""); setLojaFilter(""); clearClientSearch(); setCurrentPage(1) }}
-            className="text-sm transition-colors" style={{ color: "#94a3b8" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#475569")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#94a3b8")}
+            onClick={() => { setSourceFilter("php"); setSituacaoFilter(""); setProblemaFilter(""); setLojaFilter(""); clearClientSearch(); setCurrentPage(1) }}
+            className="text-sm transition-colors" style={{ color: "#7e8b9c" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#3c4859")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#7e8b9c")}
           >Limpar</button>
         </motion.div>
 
@@ -336,9 +383,9 @@ export default function GarantiasPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                {["# Garantia", "Pedido Original", "Cliente", "Problema", "Situação", "Loja", "Abertura", "Prazo", "Ações"].map(h => (
+                {["ID", "Solicitação", "Cliente", "Vendedor(a)", "Problema", "Entrega", "Status", "Ações"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: "#64748b" }}>{h}
+                    style={{ color: "#556376" }}>{h}
                   </th>
                 ))}
               </tr>
@@ -347,7 +394,7 @@ export default function GarantiasPage() {
               {loadingWarranties ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b" style={{ borderColor: "#f1f5f9" }}>
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 rounded animate-pulse" style={{ background: "#f1f5f9", width: "70%" }} />
                       </td>
@@ -356,24 +403,24 @@ export default function GarantiasPage() {
                 ))
               ) : warranties.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-sm" style={{ color: "#94a3b8" }}>
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: "#7e8b9c" }}>
                     Nenhuma garantia encontrada com os filtros aplicados.
                   </td>
                 </tr>
               ) : (
                 warranties.map((w, i) => {
-                  const sit    = w.situation ?? "Início"
                   // Fallback em cascata: campo da garantia → campo do pedido pai
-                  const prazoRaw   = w.scheduled_delivery ?? w.service_order?.scheduled_delivery ?? null
-                  const aberturaRaw= w.request_date       ?? w.service_order?.purchase_date      ?? null
-                  const clienteNome= w.customer_name      ?? w.service_order?.customer_name      ?? "—"
-                  const clienteCpf = w.customer_cpf
-                  const ok         = prazoOk(prazoRaw)
-                  const prazoV     = fmtDate(prazoRaw)
-                  const abertura   = fmtDate(aberturaRaw ?? undefined)
-                  const osLink     = w.service_order
+                  const prazoRaw    = w.scheduled_delivery ?? w.service_order?.scheduled_delivery ?? null
+                  const aberturaRaw = w.request_date       ?? w.service_order?.purchase_date      ?? null
+                  const clienteNome = w.customer_name?.trim()      || w.service_order?.customer_name?.trim()      || "—"
+                  const clienteCpf  = w.customer_cpf
+                  const vendedor    = w.service_order?.employee?.short_name ?? null
+                  const loja        = w.store ? `${w.store.code} · ${w.store.name}` : null
+                  const osLabel     = w.service_order
                     ? `${w.service_order.os_number}${w.service_order.os_sequence ? "/" + w.service_order.os_sequence : ""}`
-                    : "—"
+                    : null
+                  const sit         = w.situation ?? "Solicitação Criada"
+                  const prazoOkVal  = prazoOk(prazoRaw)
 
                   return (
                     <motion.tr key={w.id}
@@ -384,115 +431,113 @@ export default function GarantiasPage() {
                       onMouseEnter={e => (e.currentTarget.style.background = "#f8faff")}
                       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                     >
-                      {/* # GARANTIA */}
+                      {/* ID */}
                       <td className="px-4 py-3">
                         <Link href={`/garantias/${w.id}`}
-                          className="font-mono font-bold hover:underline" style={{ fontSize: 13, color: "#1d4ed8" }}>
-                          GR-{String(w.id).padStart(3, "0")}
+                          className="font-mono font-bold hover:underline"
+                          style={{ fontSize: 14, color: "#1d4ed8" }}>
+                          {w.id}
                         </Link>
                       </td>
 
-                      {/* PEDIDO ORIGINAL */}
+                      {/* SOLICITAÇÃO — OS + data abertura */}
                       <td className="px-4 py-3">
-                        {w.service_order ? (
-                          <Link href={`/pedidos/${w.service_order.id}`}
-                            className="font-mono hover:underline" style={{ fontSize: 13, color: "#64748b" }}>
-                            {osLink}
-                          </Link>
-                        ) : <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>}
+                        {osLabel ? (
+                          <>
+                            <Link href={`/pedidos/${w.service_order!.id}`}
+                              className="font-mono font-semibold hover:underline block"
+                              style={{ fontSize: 14, color: "#121212" }}>
+                              {osLabel}
+                            </Link>
+                            <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>
+                              {fmtDate(aberturaRaw ?? undefined)}
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 14, color: "#7e8b9c" }}>—</span>
+                        )}
                       </td>
 
                       {/* CLIENTE */}
                       <td className="px-4 py-3">
-                        <span className="font-medium block" style={{ fontSize: 13, color: "#0f172a" }}>
+                        <span className="font-medium block" style={{ fontSize: 14, color: "#121212" }}>
                           {clienteNome}
                         </span>
                         {clienteCpf && (
-                          <span className="block mt-0.5" style={{ fontSize: 11, color: "#94a3b8" }}>
+                          <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>
                             {clienteCpf}
                           </span>
                         )}
                       </td>
 
-                      {/* PROBLEMA */}
+                      {/* VENDEDOR(A) — nome + loja */}
                       <td className="px-4 py-3">
-                        {w.problem
-                          ? <StatusBadge status={w.problem.name} size="sm" />
-                          : <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>
-                        }
-                      </td>
-
-                      {/* SITUAÇÃO S/I/E */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          {WARRANTY_SITUATIONS.map((step, si) => {
-                            const idx      = WARRANTY_SITUATIONS.indexOf(sit)
-                            const isActive = si <= idx
-                            return (
-                              <span key={step}
-                                className="w-5 h-5 rounded-full flex items-center justify-center font-bold"
-                                style={{
-                                  fontSize: 10,
-                                  background: isActive
-                                    ? (si === 0 ? "#3b82f6" : si === 1 ? "#f59e0b" : "#16a34a")
-                                    : "#e2e8f0",
-                                  color: isActive ? "#fff" : "#94a3b8",
-                                }}>
-                                {["S", "I", "E"][si]}
+                        {vendedor ? (
+                          <>
+                            <span className="font-medium block" style={{ fontSize: 14, color: "#121212" }}>
+                              {vendedor}
+                            </span>
+                            {loja && (
+                              <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>
+                                {loja}
                               </span>
-                            )
-                          })}
-                        </div>
-                      </td>
-
-                      {/* LOJA */}
-                      <td className="px-4 py-3">
-                        {w.store?.code
-                          ? <span className="px-2 py-0.5 rounded-full font-semibold"
-                              style={{ fontSize: 12, background: "#dbeafe", color: "#1d4ed8" }}>
-                              {w.store.code}
-                            </span>
-                          : <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>
-                        }
-                      </td>
-
-                      {/* ABERTURA */}
-                      <td className="px-4 py-3" style={{ fontSize: 13, color: "#64748b" }}>{abertura}</td>
-
-                      {/* PRAZO */}
-                      <td className="px-4 py-3">
-                        {prazoRaw ? (
-                          <div className="flex items-center gap-1.5">
-                            {ok
-                              ? <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#3b82f6" }} />
-                              : <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#dc2626" }} />
-                            }
-                            <span style={{ fontSize: 13, color: ok ? "#475569" : "#dc2626", fontWeight: ok ? 400 : 600 }}>
-                              {prazoV}
-                            </span>
-                          </div>
+                            )}
+                          </>
+                        ) : loja ? (
+                          <span style={{ fontSize: 14, color: "#556376" }}>{loja}</span>
                         ) : (
-                          <span style={{ fontSize: 13, color: "#94a3b8" }}>—</span>
+                          <span style={{ fontSize: 14, color: "#7e8b9c" }}>—</span>
                         )}
                       </td>
+
+                      {/* PROBLEMA — texto simples */}
+                      <td className="px-4 py-3">
+                        {w.problem
+                          ? <span style={{ fontSize: 14, color: "#3c4859" }}>{w.problem.name}</span>
+                          : <span style={{ fontSize: 14, color: "#7e8b9c" }}>—</span>
+                        }
+                      </td>
+
+                      {/* ENTREGA */}
+                      <td className="px-4 py-3">
+                        {prazoRaw ? (
+                          <span style={{ fontSize: 14, color: prazoOkVal ? "#3c4859" : "#dc2626", fontWeight: prazoOkVal ? 400 : 600 }}>
+                            {fmtDate(prazoRaw)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 14, color: "#7e8b9c" }}>—</span>
+                        )}
+                      </td>
+
+                      {/* STATUS — situação granular + data/hora */}
+                      <td className="px-4 py-3">
+                        <StatusBadge status={sit} size="sm" />
+                        {w.updated_at && (
+                          <span className="block mt-0.5" style={{ fontSize: 11, color: "#7e8b9c" }}>
+                            {fmtDateTime(w.updated_at)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* AÇÕES */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <Tooltip label="Ver detalhes">
+                          <Tooltip label="Editar">
                             <Link href={`/garantias/${w.id}`}>
                               <motion.span whileHover={{ scale: 1.15 }}
-                                className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
+                                className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#7e8b9c" }}
                                 onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
                                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                <Eye style={{ width: 14, height: 14 }} />
+                                <Pencil style={{ width: 14, height: 14 }} />
                               </motion.span>
                             </Link>
                           </Tooltip>
-                          <Tooltip label="Editar">
+                          <Tooltip label="Excluir">
                             <motion.span whileHover={{ scale: 1.15 }}
-                              className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
+                              className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#7e8b9c" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "#fee2e2")}
                               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                              <Pencil style={{ width: 14, height: 14 }} />
+                              <Trash2 style={{ width: 14, height: 14 }} />
                             </motion.span>
                           </Tooltip>
                         </div>
@@ -506,7 +551,7 @@ export default function GarantiasPage() {
 
           {/* Paginação */}
           <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: "#f1f5f9" }}>
-            <div className="flex items-center gap-2 text-xs" style={{ color: "#64748b" }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: "#556376" }}>
               Mostrar
               <select value={perPage} onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
                 className="px-2 py-1 rounded border text-xs outline-none" style={{ borderColor: "#e2e8f0" }}>
@@ -519,22 +564,22 @@ export default function GarantiasPage() {
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>‹</button>
+                style={{ color: "#556376" }}>‹</button>
               {pageButtons().map((p, i) =>
                 p === "…" ? (
                   <span key={`e-${i}`} className="w-8 h-8 flex items-center justify-center text-xs"
-                    style={{ color: "#94a3b8" }}>…</span>
+                    style={{ color: "#7e8b9c" }}>…</span>
                 ) : (
                   <button key={p} onClick={() => setCurrentPage(p as number)}
                     className="w-8 h-8 rounded-lg text-xs font-medium transition-colors"
-                    style={{ background: p === safePage ? "#0f2744" : "transparent", color: p === safePage ? "#fff" : "#64748b" }}>
+                    style={{ background: p === safePage ? "#0f2744" : "transparent", color: p === safePage ? "#fff" : "#556376" }}>
                     {p}
                   </button>
                 )
               )}
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>›</button>
+                style={{ color: "#556376" }}>›</button>
             </div>
           </div>
         </motion.div>

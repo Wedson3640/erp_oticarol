@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -39,7 +39,7 @@ export default function ConversaDetailPage() {
       <Header breadcrumbs={["Home", "Conversas / CRM", conversa.cliente]} title={conversa.cliente} />
 
       <main className="pt-[64px] px-8 py-6 space-y-5">
-        <Link href="/conversas" className="inline-flex items-center gap-2 text-sm" style={{ color: "#64748b" }}>
+        <Link href="/conversas" className="inline-flex items-center gap-2 text-sm" style={{ color: "#556376" }}>
           <ArrowLeft className="w-4 h-4" /> Voltar para conversas
         </Link>
 
@@ -79,10 +79,10 @@ export default function ConversaDetailPage() {
                   { label: "Interesse",  value: conversa.interesse },
                 ].map((item) => (
                   <div key={item.label}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                       {item.label}
                     </p>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: "#0f172a" }}>{item.value}</p>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "#121212" }}>{item.value}</p>
                   </div>
                 ))}
               </div>
@@ -95,9 +95,9 @@ export default function ConversaDetailPage() {
             >
               <div className="flex items-center gap-2 mb-3">
                 <MessageCircle className="w-4 h-4" style={{ color: "#1d4ed8" }} />
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Demanda do Cliente</h3>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#121212" }}>Demanda do Cliente</h3>
               </div>
-              <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.6 }}>{conversa.demanda}</p>
+              <p style={{ fontSize: 14, color: "#3c4859", lineHeight: 1.6 }}>{conversa.demanda}</p>
             </motion.div>
 
             {/* Histórico */}
@@ -106,17 +106,17 @@ export default function ConversaDetailPage() {
               style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)", overflow: "hidden" }}
             >
               <div className="px-6 py-4" style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Histórico de Interações</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#121212" }}>Histórico de Interações</h3>
               </div>
               <div className="p-6 space-y-3">
                 {conversa.historico.map((h) => (
                   <div key={h.id} className="p-4 rounded-xl" style={{ background: "#f8faff", border: "1px solid #dbeafe" }}>
                     <div className="flex items-center justify-between mb-2">
                       <StatusBadge status={h.situacao} size="sm" />
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{h.data}</span>
+                      <span style={{ fontSize: 11, color: "#7e8b9c" }}>{h.data}</span>
                     </div>
-                    <p style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>{h.obs}</p>
-                    <span style={{ fontSize: 12, color: "#64748b" }}><strong>Operador:</strong> {h.operador}</span>
+                    <p style={{ fontSize: 14, color: "#3c4859", marginBottom: 4 }}>{h.obs}</p>
+                    <span style={{ fontSize: 12, color: "#556376" }}><strong>Operador:</strong> {h.operador}</span>
                   </div>
                 ))}
               </div>
@@ -145,12 +145,12 @@ export default function ConversaDetailPage() {
                   >
                     <div className="p-6 space-y-4">
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Nova Situação
                         </label>
                         <select value={novaSituacao} onChange={(e) => setNovaSituacao(e.target.value)}
                           className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }}
                         >
                           <option value="">Selecione...</option>
                           {conversa.situacoesDisponiveis.map((s) => (
@@ -166,20 +166,20 @@ export default function ConversaDetailPage() {
                           <p className="text-xs font-semibold mb-3" style={{ color: "#14532D" }}>Dados da Conversão</p>
                           <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
                             <div>
-                              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#64748b" }}>
+                              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#556376" }}>
                                 Sequência da OS
                               </label>
                               <input type="text" placeholder="Ex: 63220"
                                 className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                                style={{ borderColor: "#e2e8f0", color: "#0f172a" }} />
+                                style={{ borderColor: "#e2e8f0", color: "#121212" }} />
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#64748b" }}>
+                              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#556376" }}>
                                 Valor (R$)
                               </label>
                               <input type="text" placeholder="0,00"
                                 className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                                style={{ borderColor: "#e2e8f0", color: "#0f172a" }} />
+                                style={{ borderColor: "#e2e8f0", color: "#121212" }} />
                             </div>
                           </div>
                         </motion.div>
@@ -187,11 +187,11 @@ export default function ConversaDetailPage() {
 
                       {showDiv === "motivo" && (
                         <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
-                          <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                          <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                             Motivo
                           </label>
                           <select className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                            style={{ borderColor: "#e2e8f0", color: "#0f172a" }}>
+                            style={{ borderColor: "#e2e8f0", color: "#121212" }}>
                             <option>Preço alto</option>
                             <option>Não encontrou o produto</option>
                             <option>Comprou na concorrência</option>
@@ -202,11 +202,11 @@ export default function ConversaDetailPage() {
                       )}
 
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Observações
                         </label>
                         <textarea rows={2} className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none resize-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }} />
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }} />
                       </div>
                       <div className="flex justify-end">
                         <motion.button
@@ -233,19 +233,19 @@ export default function ConversaDetailPage() {
             >
               <div className="flex items-center gap-2 mb-4">
                 <UserCheck className="w-4 h-4" style={{ color: "#1d4ed8" }} />
-                <h4 style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Encaminhar Para</h4>
+                <h4 style={{ fontSize: 14, fontWeight: 700, color: "#121212" }}>Encaminhar Para</h4>
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#64748b" }}>Loja</label>
-                  <select className="w-full px-3 py-2 rounded-xl text-sm border outline-none" style={{ borderColor: "#e2e8f0", color: "#0f172a" }}>
+                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#556376" }}>Loja</label>
+                  <select className="w-full px-3 py-2 rounded-xl text-sm border outline-none" style={{ borderColor: "#e2e8f0", color: "#121212" }}>
                     <option>488 — Teresina Shopping</option>
                     <option>1060 — Shopping do Povo</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#64748b" }}>Consultor</label>
-                  <select className="w-full px-3 py-2 rounded-xl text-sm border outline-none" style={{ borderColor: "#e2e8f0", color: "#0f172a" }}>
+                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#556376" }}>Consultor</label>
+                  <select className="w-full px-3 py-2 rounded-xl text-sm border outline-none" style={{ borderColor: "#e2e8f0", color: "#121212" }}>
                     <option>Ana Souza</option>
                     <option>Carlos Lima</option>
                     <option>Juliana Dias</option>

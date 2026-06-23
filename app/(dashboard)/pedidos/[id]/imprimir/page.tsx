@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { use, useState, useEffect, useCallback, useRef } from "react"
 import { Loader2, Printer } from "lucide-react"
@@ -111,9 +111,9 @@ export default function ImprimirPedidoPage({
         /* ── Cabeçalho ─────────────────── */
         .hdr { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 16px; border-bottom: 2px solid #0f2744; margin-bottom: 20px; }
         .hdr-logo-nome { font-size: 26px; font-weight: 800; color: #0f2744; letter-spacing: -0.5px; line-height: 1.1; }
-        .hdr-logo-sub  { font-size: 10px; color: #64748b; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
-        .hdr-info { text-align: right; font-size: 10px; color: #64748b; line-height: 1.7; }
-        .hdr-info strong { color: #0f172a; }
+        .hdr-logo-sub  { font-size: 10px; color: #556376; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+        .hdr-info { text-align: right; font-size: 10px; color: #556376; line-height: 1.7; }
+        .hdr-info strong { color: #121212; }
 
         /* ── Título OS ─────────────────── */
         .os-titulo { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
@@ -123,30 +123,30 @@ export default function ImprimirPedidoPage({
 
         /* ── Seções ─────────────────────── */
         .section { margin-bottom: 18px; }
-        .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+        .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #556376; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
         .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
         .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 20px; }
-        .field-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-bottom: 2px; }
-        .field-value { font-size: 12px; color: #0f172a; font-weight: 500; }
+        .field-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #7e8b9c; margin-bottom: 2px; }
+        .field-value { font-size: 12px; color: #121212; font-weight: 500; }
 
         /* ── Histórico ─────────────────── */
         .hist-row { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
-        .hist-date { color: #64748b; white-space: nowrap; min-width: 110px; }
+        .hist-date { color: #556376; white-space: nowrap; min-width: 110px; }
         .hist-sit  { font-weight: 600; min-width: 130px; }
-        .hist-op   { color: #475569; }
-        .hist-obs  { color: #475569; font-style: italic; }
+        .hist-op   { color: #3c4859; }
+        .hist-obs  { color: #3c4859; font-style: italic; }
 
         /* ── Assinatura ────────────────── */
         .assinatura { margin-top: 32px; display: flex; gap: 40px; }
-        .assinatura-linha { flex: 1; border-top: 1px solid #374151; padding-top: 6px; text-align: center; font-size: 10px; color: #64748b; }
+        .assinatura-linha { flex: 1; border-top: 1px solid #2f3745; padding-top: 6px; text-align: center; font-size: 10px; color: #556376; }
 
         /* ── Rodapé ─────────────────────── */
-        .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 9px; color: #94a3b8; text-align: center; }
+        .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 9px; color: #7e8b9c; text-align: center; }
 
         /* ── Botão tela ─────────────────── */
         .no-print { gap: 12px; justify-content: center; padding: 14px 0; max-width: 794px; margin: 0 auto; }
         .btn-print { display: inline-flex; align-items: center; gap: 6px; background: #0f2744; color: #fff; border: none; border-radius: 10px; padding: 10px 22px; font-size: 13px; font-weight: 600; cursor: pointer; }
-        .btn-close { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #475569; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 22px; font-size: 13px; cursor: pointer; }
+        .btn-close { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #3c4859; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 22px; font-size: 13px; cursor: pointer; }
       `}</style>
 
       {/* ── Botões visíveis só na tela ── */}
@@ -238,7 +238,7 @@ export default function ImprimirPedidoPage({
           {order.notes && (
             <div style={{ marginTop: 12 }}>
               <div className="field-label">Observações</div>
-              <div className="field-value" style={{ fontStyle: "italic", color: "#475569" }}>{order.notes}</div>
+              <div className="field-value" style={{ fontStyle: "italic", color: "#3c4859" }}>{order.notes}</div>
             </div>
           )}
         </div>
@@ -286,6 +286,6 @@ function situacaoBadgeStyle(sit: string): React.CSSProperties {
     "Entregue":          ["#f0fdf4", "#15803d"],
     "Cancelado":         ["#fef2f2", "#dc2626"],
   }
-  const [bg, color] = map[sit] ?? ["#f1f5f9", "#475569"]
+  const [bg, color] = map[sit] ?? ["#f1f5f9", "#3c4859"]
   return { background: bg, color, border: `1px solid ${color}33` }
 }

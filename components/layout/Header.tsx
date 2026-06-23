@@ -1,17 +1,35 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Bell, ChevronDown } from "lucide-react"
 import { initials } from "@/lib/utils"
 import { Tooltip } from "@/components/ui/Tooltip"
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 interface HeaderProps {
   breadcrumbs: string[]
   title: string
 }
 
-const currentUser = { name: "Ana Souza" }
+/** "wedson.veras" → "Wedson Veras" */
+function fmtUsername(u: string): string {
+  return u
+    .split(".")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ")
+}
 
 export function Header({ breadcrumbs, title }: HeaderProps) {
+  const [displayName, setDisplayName] = useState("Usuário")
+
+  useEffect(() => {
+    createSupabaseBrowserClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        const u = data.user?.user_metadata?.username as string | undefined
+        if (u) setDisplayName(fmtUsername(u))
+      })
+  }, [])
   return (
     <header
       className="fixed top-0 right-0 flex items-center justify-between px-8 z-20"
@@ -75,10 +93,10 @@ export function Header({ breadcrumbs, title }: HeaderProps) {
             className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
             style={{ background: "linear-gradient(135deg,#3B82F6,#0F5BFF)" }}
           >
-            {initials(currentUser.name)}
+            {initials(displayName)}
           </div>
           <span style={{ fontSize: 13, fontWeight: 500, color: "#061A35" }}>
-            {currentUser.name}
+            {displayName}
           </span>
           <ChevronDown style={{ width: 13, height: 13, color: "#60708A" }} />
         </div>

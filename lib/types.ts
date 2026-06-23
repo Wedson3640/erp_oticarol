@@ -1,6 +1,6 @@
 // ─── Tipos centrais do sascarol ──────────────────────────────────────────────
 
-export type Source = 'php' | 'rails' | 'manual' | 'both'
+export type Source = 'php' | 'rails' | 'manual' | 'both' | 'app'
 
 export interface Store {
   id:        number
@@ -72,7 +72,7 @@ export interface Lens {
 export interface ServiceOrder {
   id:                number
   os_number:         string
-  os_sequence:       string | null
+  os_sequence:       string
   customer_name:     string | null   // denormalizado
   employee_name:     string | null   // denormalizado
   customer_id:       number | null
@@ -229,6 +229,57 @@ export function fmtCpf(v: string | null | undefined): string {
   const d = v.replace(/\D/g, "")
   if (d.length === 11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`
   return v
+}
+
+// ─── shipments (remessas) ────────────────────────────────────────────────────
+
+export interface Shipment {
+  id:               number
+  source:           Source
+  source_erp_id:    number | null
+  source_rails_id:  number | null
+  store_id:         number | null
+  employee_id:      number | null
+  customer_name:    string | null
+  ship_date:        string | null
+  addr_street:      string | null
+  addr_number:      string | null
+  addr_complement:  string | null
+  addr_zip:         string | null
+  addr_district:    string | null
+  addr_city:        string | null
+  addr_uf:          string | null
+  tracking_number:  string | null
+  notes:            string | null
+  flag:             number
+  deleted_at:       string | null
+  created_at:       string
+  updated_at:       string
+  // joins
+  store?:    Pick<Store,    'id' | 'code' | 'name'> | null
+  employee?: Pick<Employee, 'id' | 'short_name'> | null
+}
+
+// ─── coupons (cupons de desconto) ────────────────────────────────────────────
+
+export interface Coupon {
+  id:                number
+  source_rails_id:   number | null
+  name:              string
+  discount_type:     'percent' | 'value'
+  discount_percent:  number | null
+  discount_value:    number | null
+  minimum_value:     number | null
+  description:       string | null
+  expiration:        string | null
+  redemptions_count: number
+  created_by_id:     number | null
+  active:            boolean
+  deleted_at:        string | null
+  created_at:        string
+  updated_at:        string
+  // join
+  created_by?: Pick<Employee, 'id' | 'short_name'> | null
 }
 
 // ─── Paginação ────────────────────────────────────────────────────────────────

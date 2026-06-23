@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { use, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -210,9 +210,9 @@ export default function EditarPedidoPage({
 
         <Link href={`/pedidos/${order.id}`}
           className="inline-flex items-center gap-2 text-sm transition-colors"
-          style={{ color: "#64748b" }}
+          style={{ color: "#556376" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#0f2744")}
-          onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+          onMouseLeave={e => (e.currentTarget.style.color = "#556376")}
         >
           <ArrowLeft className="w-4 h-4" /> Voltar para o pedido
         </Link>
@@ -243,7 +243,7 @@ export default function EditarPedidoPage({
 
             {/* ── Cliente por CPF ─────────────────────────────────────── */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                 Cliente (buscar por CPF)
               </label>
               <div className="flex gap-2">
@@ -253,7 +253,7 @@ export default function EditarPedidoPage({
                   onKeyDown={e => e.key === "Enter" && handleCpfSearch()}
                   placeholder="000.000.000-00"
                   className="flex-1 px-3 py-2.5 rounded-xl text-sm border outline-none"
-                  style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                  style={{ borderColor: "#e2e8f0", color: "#121212" }}
                   onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                   onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                 />
@@ -269,8 +269,8 @@ export default function EditarPedidoPage({
               )}
               {customerResult && (
                 <div className="mt-2 p-3 rounded-xl" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{customerResult.name}</p>
-                  <p style={{ fontSize: 12, color: "#64748b" }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "#121212" }}>{customerResult.name}</p>
+                  <p style={{ fontSize: 12, color: "#556376" }}>
                     CPF: {fmtCpf(customerResult.cpf)} &nbsp;·&nbsp; Tel: {customerResult.phone ?? "—"}
                   </p>
                 </div>
@@ -280,12 +280,12 @@ export default function EditarPedidoPage({
             {/* ── Loja / Vendedor ─────────────────────────────────────── */}
             <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                   Loja
                 </label>
                 <select value={storeId ?? ""} onChange={e => setStoreId(Number(e.target.value) || null)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                  style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                  style={{ borderColor: "#e2e8f0", color: "#121212" }}
                   onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                   onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                 >
@@ -295,12 +295,12 @@ export default function EditarPedidoPage({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                   Vendedor(a)
                 </label>
                 <select value={employeeId ?? ""} onChange={e => setEmployeeId(Number(e.target.value) || null)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                  style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                  style={{ borderColor: "#e2e8f0", color: "#121212" }}
                   onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                   onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                 >
@@ -313,12 +313,12 @@ export default function EditarPedidoPage({
             {/* ── Laboratório / Nº OS Lab ─────────────────────────────── */}
             <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                   Laboratório
                 </label>
                 <select value={laboratoryId ?? ""} onChange={e => setLaboratoryId(Number(e.target.value) || null)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                  style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                  style={{ borderColor: "#e2e8f0", color: "#121212" }}
                   onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                   onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                 >
@@ -328,7 +328,7 @@ export default function EditarPedidoPage({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                   Nº OS Laboratório
                 </label>
                 <input
@@ -336,7 +336,7 @@ export default function EditarPedidoPage({
                   onChange={e => setLabOsNumber(e.target.value)}
                   placeholder="Ex: GV-12345"
                   className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                  style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                  style={{ borderColor: "#e2e8f0", color: "#121212" }}
                   onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                   onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                 />
@@ -346,7 +346,7 @@ export default function EditarPedidoPage({
             {/* ── Prazo / Urgente ─────────────────────────────────────── */}
             <div className="grid gap-5 items-end" style={{ gridTemplateColumns: "1fr auto" }}>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                   Prazo de Entrega
                 </label>
                 <input
@@ -354,7 +354,7 @@ export default function EditarPedidoPage({
                   value={scheduledDate}
                   onChange={e => setScheduledDate(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                  style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                  style={{ borderColor: "#e2e8f0", color: "#121212" }}
                   onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                   onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                 />
@@ -367,7 +367,7 @@ export default function EditarPedidoPage({
                   onChange={e => setUrgent(e.target.checked)}
                   className="w-4 h-4 rounded accent-red-600"
                 />
-                <span className="text-sm font-semibold" style={{ color: urgent ? "#dc2626" : "#475569" }}>
+                <span className="text-sm font-semibold" style={{ color: urgent ? "#dc2626" : "#3c4859" }}>
                   Urgente
                 </span>
               </label>
@@ -375,7 +375,7 @@ export default function EditarPedidoPage({
 
             {/* ── Observações ─────────────────────────────────────────── */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                 Observações
               </label>
               <textarea
@@ -384,7 +384,7 @@ export default function EditarPedidoPage({
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Observações do pedido..."
                 className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none resize-none"
-                style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                style={{ borderColor: "#e2e8f0", color: "#121212" }}
                 onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                 onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
               />
@@ -395,7 +395,7 @@ export default function EditarPedidoPage({
           <div className="flex items-center justify-between mt-6 pt-5" style={{ borderTop: "1px solid #f1f5f9" }}>
             <Link href={`/pedidos/${order.id}`}
               className="px-5 py-2.5 rounded-xl text-sm font-medium border"
-              style={{ borderColor: "#e2e8f0", color: "#475569" }}
+              style={{ borderColor: "#e2e8f0", color: "#3c4859" }}
             >
               Cancelar
             </Link>

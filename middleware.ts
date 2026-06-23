@@ -51,6 +51,16 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
+  // ── Primeiro acesso: redireciona para trocar senha ───────────────────────
+  // first_login é gravado em user_metadata (sem query extra ao banco).
+  if (
+    session &&
+    session.user.user_metadata?.first_login === true &&
+    !pathname.startsWith("/trocar-senha")
+  ) {
+    return NextResponse.redirect(new URL("/trocar-senha", request.url))
+  }
+
   return response
 }
 

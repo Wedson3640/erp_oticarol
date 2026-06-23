@@ -8,7 +8,6 @@ import {
   FlaskConical, Building2, Lock, LogOut, Glasses,
   BarChart3,
 } from "lucide-react"
-import { initials } from "@/lib/utils"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 // ─── Dados de navegação ───────────────────────────────────────────────────────
@@ -50,10 +49,6 @@ const navGroups = [
   },
 ]
 
-// ─── Mock: usuário logado ─────────────────────────────────────────────────────
-
-const currentUser = { name: "Ana Souza", store: "488" }
-
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 export function Sidebar() {
@@ -87,31 +82,6 @@ export function Sidebar() {
           <Glasses className="w-5 h-5 text-white" />
         </div>
         <span className="text-white font-bold text-xl tracking-tight">Ótica Carol</span>
-      </div>
-
-      {/* Usuário */}
-      <div
-        className="mx-4 mb-4 px-4 py-3 rounded-2xl flex items-center gap-3"
-        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)" }}
-      >
-        <div
-          className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-xs"
-          style={{
-            background: "linear-gradient(135deg,#3B82F6,#0F5BFF)",
-            border: "2px solid rgba(255,255,255,0.25)",
-          }}
-        >
-          {initials(currentUser.name)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-white font-semibold text-sm truncate">{currentUser.name}</p>
-          <span
-            className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{ background: "#0F5BFF", color: "#fff", fontSize: 11 }}
-          >
-            Loja {currentUser.store}
-          </span>
-        </div>
       </div>
 
       {/* Nav */}

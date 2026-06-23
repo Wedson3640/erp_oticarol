@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { use, useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import { SlaCard } from "@/components/ui/SlaCard"
 import {
-  ArrowLeft, ChevronDown, Printer,
+  ArrowLeft, ChevronDown, Printer, Pencil,
   Clock, Package, CheckCircle2, Truck, XCircle,
   Building2, Wrench, Tag, Loader2,
   FlaskConical, Store,
@@ -65,23 +65,11 @@ const timelineColor: Record<string, string> = {
   "Cancelado":                  "#dc2626",
 }
 
-// Situações disponíveis no "Mover Solicitação"
-const SITUACOES = [
-  "Recebido no laboratório",
-  "Análise de recebimento",
-  "Controle de qualidade",
-  "Trânsito",
-  "Recebido na loja",
-  "Aguardando Retirada",
-  "Entregue ao cliente",
-  "Fechado pelo administrador",
-]
-
 const servicoColor: Record<string, { bg: string; text: string }> = {
   "Adaptação":  { bg: "#CCFBF1", text: "#134E4A" },
   "Troca":      { bg: "#DBEAFE", text: "#1E40AF" },
   "Manutenção": { bg: "#FEF3C7", text: "#92400E" },
-  "Outros":     { bg: "#F1F5F9", text: "#475569" },
+  "Outros":     { bg: "#F1F5F9", text: "#3c4859" },
 }
 
 function Chip({ label, colors }: { label: string; colors: { bg: string; text: string } }) {
@@ -114,6 +102,9 @@ export default function SolicitacaoDetailPage({
   const [obsInput,     setObsInput]     = useState("")
   const [saving,       setSaving]       = useState(false)
 
+  // Transições dinâmicas do banco
+  const [flowOptions, setFlowOptions] = useState<{ title: string; ui_hint: string | null }[]>([])
+
   // ── Carga ───────────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
@@ -137,7 +128,27 @@ export default function SolicitacaoDetailPage({
       setError("Solicitação não encontrada.")
     } else {
       setRequest(rRes.data as Request)
-      setHistories((hRes.data ?? []) as RequestHistory[])
+      const hists = (hRes.data ?? []) as RequestHistory[]
+      setHistories(hists)
+
+      // Situação efetiva = último histórico (DESC → index 0 é o mais recente)
+      const situacao = hists[0]?.situation ?? (rRes.data as Request).situation
+      if (situacao) {
+        const sitRes = await sb.from("solicitation_situations").select("id").eq("title", situacao).single()
+        if (sitRes.data) {
+          const flowRes = await sb
+            .from("solicitation_situation_flows")
+            .select("ui_hint, next:next_id(title)")
+            .eq("actual_id", sitRes.data.id)
+            .eq("active", true)
+          setFlowOptions((flowRes.data ?? []).map(f => ({
+            title:   ((f.next as unknown) as { title: string }).title,
+            ui_hint: f.ui_hint as string | null,
+          })))
+        } else {
+          setFlowOptions([])
+        }
+      }
     }
     setLoading(false)
   }, [id])
@@ -195,7 +206,6 @@ export default function SolicitacaoDetailPage({
   const prazo  = fmtDate(request.scheduled_delivery)
   const criado = fmtDateTime(request.created_at)
 
-  const situacoesDisponiveis = SITUACOES.filter(s => s !== sit)
 
   // Timeline cronológica (histories chegam desc do Supabase)
   const historiesAsc = [...histories].reverse()
@@ -219,9 +229,9 @@ export default function SolicitacaoDetailPage({
 
         <Link href="/solicitacoes"
           className="inline-flex items-center gap-2 text-sm transition-colors"
-          style={{ color: "#64748b" }}
+          style={{ color: "#556376" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#0f2744")}
-          onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+          onMouseLeave={e => (e.currentTarget.style.color = "#556376")}
         >
           <ArrowLeft className="w-4 h-4" /> Voltar para solicitações
         </Link>
@@ -243,15 +253,22 @@ export default function SolicitacaoDetailPage({
                     </span>
                     <StatusBadge status={sit} size="md" />
                   </div>
-                  <p style={{ fontSize: 13, color: "#64748b" }}>
+                  <p style={{ fontSize: 14, color: "#556376" }}>
                     Criado em {criado} · Prazo:{" "}
-                    <strong style={{ color: "#0f172a" }}>{prazo}</strong>
+                    <strong style={{ color: "#121212" }}>{prazo}</strong>
                   </p>
                 </div>
-                <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
-                  style={{ borderColor: "#e2e8f0", color: "#475569", background: "#f8fafc" }}>
-                  <Printer className="w-4 h-4" /> Imprimir
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link href={`/solicitacoes/${request.id}/editar`}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+                    style={{ borderColor: "#bfdbfe", color: "#1d4ed8", background: "#eff6ff" }}>
+                    <Pencil className="w-4 h-4" /> Editar
+                  </Link>
+                  <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+                    style={{ borderColor: "#e2e8f0", color: "#3c4859", background: "#f8fafc" }}>
+                    <Printer className="w-4 h-4" /> Imprimir
+                  </button>
+                </div>
               </div>
 
               {/* Grid de info */}
@@ -266,10 +283,10 @@ export default function SolicitacaoDetailPage({
                   { icon: Tag,       label: "Modelo",   value: request.frame_model ?? "—" },
                 ].map(item => (
                   <div key={item.label}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                       {item.label}
                     </p>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: "#0f172a" }}>{item.value}</p>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "#121212" }}>{item.value}</p>
                   </div>
                 ))}
               </div>
@@ -277,15 +294,15 @@ export default function SolicitacaoDetailPage({
               {/* Chips */}
               <div className="flex items-center gap-3 mt-4 pt-4" style={{ borderTop: "1px solid #f1f5f9" }}>
                 <div className="flex items-center gap-2">
-                  <Wrench className="w-4 h-4" style={{ color: "#94a3b8" }} />
-                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Serviço:</span>
+                  <Wrench className="w-4 h-4" style={{ color: "#7e8b9c" }} />
+                  <span style={{ fontSize: 12, color: "#7e8b9c" }}>Serviço:</span>
                   <Chip label={request.service_type}
-                    colors={servicoColor[request.service_type] ?? { bg: "#f1f5f9", text: "#475569" }} />
+                    colors={servicoColor[request.service_type] ?? { bg: "#f1f5f9", text: "#3c4859" }} />
                 </div>
                 {request.frame_type && (
                   <div className="flex items-center gap-2">
-                    <Tag className="w-4 h-4" style={{ color: "#94a3b8" }} />
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Armação:</span>
+                    <Tag className="w-4 h-4" style={{ color: "#7e8b9c" }} />
+                    <span style={{ fontSize: 12, color: "#7e8b9c" }}>Armação:</span>
                     <Chip label={request.frame_type} colors={{ bg: "#EDE9FE", text: "#4C1D95" }} />
                   </div>
                 )}
@@ -293,10 +310,10 @@ export default function SolicitacaoDetailPage({
 
               {request.notes && (
                 <div className="mt-4 p-3 rounded-xl" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                     Observações
                   </p>
-                  <p style={{ fontSize: 13, color: "#475569" }}>{request.notes}</p>
+                  <p style={{ fontSize: 14, color: "#3c4859" }}>{request.notes}</p>
                 </div>
               )}
             </motion.div>
@@ -306,7 +323,7 @@ export default function SolicitacaoDetailPage({
               style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)", overflow: "hidden" }}
             >
               <div className="px-6 py-4" style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Resumo</h3>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#121212" }}>Resumo</h3>
               </div>
               <div className="p-6">
                 <div className="grid gap-x-8 gap-y-4" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
@@ -319,10 +336,10 @@ export default function SolicitacaoDetailPage({
                     { label: "Prazo",     value: prazo },
                   ].map(item => (
                     <div key={item.label}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                         {item.label}
                       </p>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: "#0f172a" }}>{item.value}</p>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: "#121212" }}>{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -353,29 +370,29 @@ export default function SolicitacaoDetailPage({
                   >
                     <div className="p-6 space-y-4">
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Nova Situação
                         </label>
                         <select value={novaSituacao} onChange={e => setNovaSituacao(e.target.value)}
                           className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }}
                           onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                           onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                         >
                           <option value="">Selecione...</option>
-                          {situacoesDisponiveis.map(s => (
-                            <option key={s} value={s}>{s}</option>
+                          {flowOptions.map(opt => (
+                            <option key={opt.title} value={opt.title}>{opt.title}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Observações
                         </label>
                         <textarea rows={2} value={obsInput} onChange={e => setObsInput(e.target.value)}
                           placeholder="Adicionar observação (opcional)..."
                           className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none resize-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }}
                           onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                           onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                         />
@@ -412,22 +429,22 @@ export default function SolicitacaoDetailPage({
               style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)", overflow: "hidden" }}
             >
               <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Histórico</h4>
-                <span style={{ fontSize: 11, color: "#94a3b8" }}>{historiesAsc.length} etapa{historiesAsc.length !== 1 ? "s" : ""}</span>
+                <h4 style={{ fontSize: 14, fontWeight: 700, color: "#121212" }}>Histórico</h4>
+                <span style={{ fontSize: 11, color: "#7e8b9c" }}>{historiesAsc.length} etapa{historiesAsc.length !== 1 ? "s" : ""}</span>
               </div>
 
               {historiesAsc.length === 0 ? (
-                <p className="px-4 py-6 text-xs text-center" style={{ color: "#94a3b8" }}>
+                <p className="px-4 py-6 text-xs text-center" style={{ color: "#7e8b9c" }}>
                   Nenhuma movimentação registrada.
                 </p>
               ) : (
                 <div style={{ padding: "14px 14px 10px" }}>
                   {historiesAsc.map((h, i) => {
-                    const cor    = timelineColor[h.situation] ?? "#94a3b8"
+                    const cor    = timelineColor[h.situation] ?? "#7e8b9c"
                     const icone  = timelineIcon[h.situation]  ?? <Clock className="w-3 h-3" />
                     const isLast = i === historiesAsc.length - 1
                     const next   = historiesAsc[i + 1]
-                    const nextCor = next ? (timelineColor[next.situation] ?? "#94a3b8") : cor
+                    const nextCor = next ? (timelineColor[next.situation] ?? "#7e8b9c") : cor
                     const dur    = next
                       ? calcDuration(h.created_at, next.created_at)
                       : calcDuration(h.created_at, null)
@@ -442,7 +459,7 @@ export default function SolicitacaoDetailPage({
                             width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
                             background: isLast ? `${cor}22` : "#f1f5f9",
                             border: `2px solid ${isLast ? cor : "#d1d5db"}`,
-                            color: isLast ? cor : "#9ca3af",
+                            color: isLast ? cor : "#858b95",
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}>
                             {icone}
@@ -452,26 +469,26 @@ export default function SolicitacaoDetailPage({
                           <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
                             <div style={{
                               fontSize: 12, fontWeight: 700,
-                              color: isLast ? cor : "#374151",
+                              color: isLast ? cor : "#2f3745",
                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}>
                               {h.situation}
                             </div>
-                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>
+                            <div style={{ fontSize: 11, color: "#5b616d", marginTop: 1 }}>
                               {fmtDateTime(h.created_at)}
                             </div>
                             {h.operator_name && (
-                              <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>
+                              <div style={{ fontSize: 10, color: "#858b95", marginTop: 1 }}>
                                 {h.operator_name}
                               </div>
                             )}
                             {h.notes && (
-                              <div style={{ fontSize: 10, color: "#6b7280", fontStyle: "italic", marginTop: 1 }}>
+                              <div style={{ fontSize: 10, color: "#5b616d", fontStyle: "italic", marginTop: 1 }}>
                                 {h.notes}
                               </div>
                             )}
                             {isLast && (
-                              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>
+                              <div style={{ fontSize: 10, color: "#7e8b9c", marginTop: 2 }}>
                                 há {dur}
                               </div>
                             )}
@@ -493,7 +510,7 @@ export default function SolicitacaoDetailPage({
                               <div style={{ width: 2, height: 8, background: nextCor, opacity: 0.45 }} />
                             </div>
                             <div style={{
-                              fontSize: 10, color: "#94a3b8", letterSpacing: "0.02em",
+                              fontSize: 10, color: "#7e8b9c", letterSpacing: "0.02em",
                               background: "#f8fafc", border: "1px solid #e2e8f0",
                               borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap",
                             }}>

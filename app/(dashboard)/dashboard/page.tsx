@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { Header } from "@/components/layout/Header"
@@ -303,12 +303,12 @@ export default function DashboardPage() {
                     </div>
                   )}
                   {card.sub && (
-                    <p className="mt-2" style={{ fontSize: 13, color: card.subColor, fontWeight: 500 }}>
+                    <p className="mt-2" style={{ fontSize: 14, color: card.subColor, fontWeight: 500 }}>
                       {card.sub}
                     </p>
                   )}
                   {card.sub2 && (
-                    <p className="mt-2" style={{ fontSize: 12, color: "#94A3B8" }}>{card.sub2}</p>
+                    <p className="mt-2" style={{ fontSize: 12, color: "#7e8b9c" }}>{card.sub2}</p>
                   )}
                 </motion.div>
               ))}
@@ -361,11 +361,11 @@ export default function DashboardPage() {
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     >
                       <td style={{ padding: "0 20px", fontSize: 14, fontWeight: 600, color: "#061A35" }}>{s.name}</td>
-                      <td style={{ padding: "0 20px", fontSize: 13, color: "#40516F" }}>{fmt(s.metaRX)}</td>
-                      <td style={{ padding: "0 20px", fontSize: 13, color: "#40516F" }}>{fmt(s.realRX)}</td>
+                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.metaRX)}</td>
+                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.realRX)}</td>
                       <td style={{ padding: "0 20px", minWidth: 120 }}><PctBar pct={s.pctRX} /></td>
-                      <td style={{ padding: "0 20px", fontSize: 13, color: "#40516F" }}>{fmt(s.metaSol)}</td>
-                      <td style={{ padding: "0 20px", fontSize: 13, color: "#40516F" }}>{fmt(s.realSol)}</td>
+                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.metaSol)}</td>
+                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.realSol)}</td>
                       <td style={{ padding: "0 20px", minWidth: 120 }}><PctBar pct={s.pctSol} /></td>
                     </tr>
                   ))}
@@ -425,7 +425,7 @@ export default function DashboardPage() {
               {!loadingMetrics && (
                 <div className="flex items-center justify-between pt-2" style={{ borderTop: "1px solid #EAF2FF" }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#061A35" }}>Total (ativos)</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#0F5BFF" }}>{totalPie}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#0F5BFF" }}>{totalPie}</span>
                 </div>
               )}
             </div>

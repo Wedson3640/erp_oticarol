@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { motion } from "framer-motion"
@@ -49,19 +49,19 @@ export default function MetasPage() {
         >
           <div className="flex items-center gap-3">
             <button className="p-2 rounded-xl" style={{ background: "#fff", border: "1px solid #e2e8f0" }}>
-              <ChevronLeft className="w-4 h-4" style={{ color: "#64748b" }} />
+              <ChevronLeft className="w-4 h-4" style={{ color: "#556376" }} />
             </button>
-            <div className="px-4 py-2 rounded-xl font-semibold text-sm" style={{ background: "#fff", border: "1px solid #e2e8f0", color: "#0f172a" }}>
+            <div className="px-4 py-2 rounded-xl font-semibold text-sm" style={{ background: "#fff", border: "1px solid #e2e8f0", color: "#121212" }}>
               {hoje}
             </div>
             <button className="p-2 rounded-xl" style={{ background: "#fff", border: "1px solid #e2e8f0" }}>
-              <ChevronRight className="w-4 h-4" style={{ color: "#64748b" }} />
+              <ChevronRight className="w-4 h-4" style={{ color: "#556376" }} />
             </button>
-            <span className="text-sm" style={{ color: "#64748b" }}>Loja 488 — Teresina Shopping</span>
+            <span className="text-sm" style={{ color: "#556376" }}>Loja 488 — Teresina Shopping</span>
           </div>
           <div className="flex items-center gap-2">
             <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border"
-              style={{ background: "#fff", borderColor: "#e2e8f0", color: "#475569" }}>
+              style={{ background: "#fff", borderColor: "#e2e8f0", color: "#3c4859" }}>
               Relatório
             </button>
             <motion.button
@@ -131,7 +131,7 @@ export default function MetasPage() {
                     style={{ background: rowBg(totalPct, m.folga), borderBottom: i < metas.length - 1 ? "1px solid #F0F5FF" : "none", opacity: m.folga ? 0.6 : 1 }}>
                     <td style={{ padding: "12px 16px", fontWeight: 600, color: "#061A35" }}>
                       {m.nome}
-                      {m.folga && <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: "#e2e8f0", color: "#64748b", fontSize: 10 }}>FOLGA</span>}
+                      {m.folga && <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: "#e2e8f0", color: "#556376", fontSize: 10 }}>FOLGA</span>}
                     </td>
                     {[
                       { meta: m.metaRX,  real: m.realRX  },
@@ -139,10 +139,10 @@ export default function MetasPage() {
                       { meta: m.metaLen, real: m.realLen },
                     ].map((cat, ci) => (
                       <>
-                        <td key={`m${ci}`} style={{ padding: "12px 16px", fontSize: 13, color: "#40516F" }}>{fmt(cat.meta)}</td>
-                        <td key={`r${ci}`} style={{ padding: "12px 16px", fontSize: 13, color: "#40516F" }}>{fmt(cat.real)}</td>
+                        <td key={`m${ci}`} style={{ padding: "12px 16px", fontSize: 14, color: "#40516F" }}>{fmt(cat.meta)}</td>
+                        <td key={`r${ci}`} style={{ padding: "12px 16px", fontSize: 14, color: "#40516F" }}>{fmt(cat.real)}</td>
                         <td key={`p${ci}`} style={{ padding: "12px 16px" }}>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: pctColor(pct(cat.real, cat.meta)) }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: pctColor(pct(cat.real, cat.meta)) }}>
                             {pct(cat.real, cat.meta)}%
                           </span>
                         </td>
@@ -165,17 +165,17 @@ export default function MetasPage() {
 
               {/* Totais */}
               <tr style={{ background: "#0f2744" }}>
-                <td style={{ padding: "12px 16px", fontWeight: 700, color: "#fff", fontSize: 13 }}>TOTAL</td>
+                <td style={{ padding: "12px 16px", fontWeight: 700, color: "#fff", fontSize: 14 }}>TOTAL</td>
                 {[
                   { meta: totals.metaRX,  real: totals.realRX  },
                   { meta: totals.metaSol, real: totals.realSol },
                   { meta: totals.metaLen, real: totals.realLen },
                 ].map((cat, ci) => (
                   <>
-                    <td key={`tm${ci}`} style={{ padding: "12px 16px", color: "#93c5fd", fontSize: 13 }}>{fmt(cat.meta)}</td>
-                    <td key={`tr${ci}`} style={{ padding: "12px 16px", color: "#fff", fontWeight: 700, fontSize: 13 }}>{fmt(cat.real)}</td>
+                    <td key={`tm${ci}`} style={{ padding: "12px 16px", color: "#93c5fd", fontSize: 14 }}>{fmt(cat.meta)}</td>
+                    <td key={`tr${ci}`} style={{ padding: "12px 16px", color: "#fff", fontWeight: 700, fontSize: 14 }}>{fmt(cat.real)}</td>
                     <td key={`tp${ci}`} style={{ padding: "12px 16px" }}>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: pctColor(pct(cat.real, cat.meta)) }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: pctColor(pct(cat.real, cat.meta)) }}>
                         {pct(cat.real, cat.meta)}%
                       </span>
                     </td>

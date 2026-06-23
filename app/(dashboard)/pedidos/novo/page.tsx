@@ -1,57 +1,37 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
 import {
   ArrowLeft, Flame, Search, UserPlus, User,
-  MapPin, Loader2, X, Check, MessageCircle,
+  Loader2, X, Check, AlertTriangle, ExternalLink,
 } from "lucide-react"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-interface Store        { id: number; code: string; name: string }
+interface StoreOption  { id: number; code: string; name: string }
 interface Employee     { id: number; full_name: string; short_name: string | null; store_id: number | null }
 interface DeliveryTime { id: number; description: string; days: number }
 
 interface ClientResult {
-  id: number
-  name: string
+  id:    number
+  name:  string
   cpf:   string | null
   phone: string | null
 }
 
-interface ClientForm {
-  // customers
-  name: string; cpf: string; phone: string; phone_is_whatsapp: boolean
-  // customer_addresses (nomes = colunas do banco)
-  zip_code: string; street: string; number: string
-  complement: string; district: string; city: string; state: string
-  reference_point: string
-}
-
 interface UserProfile {
-  role:       string          // 'admin' | 'manager' | 'seller' | ...
-  store_id:   number | null
+  role:        string
+  store_id:    number | null
   employee_id: number | null
-  full_name:  string
+  full_name:   string
 }
 
-// ─── CEP → ViaCEP ─────────────────────────────────────────────────────────────
-
-async function buscaCep(cep: string) {
-  const c = cep.replace(/\D/g, "")
-  if (c.length !== 8) return null
-  try {
-    const r = await fetch(`https://viacep.com.br/ws/${c}/json/`)
-    const d = await r.json()
-    return d.erro ? null : d
-  } catch { return null }
-}
-
-// ─── Primeiro dia do mês corrente (min date para vendedor) ────────────────────
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const primeiroDiaMes = new Date(
   new Date().getFullYear(),
@@ -61,22 +41,18 @@ const primeiroDiaMes = new Date(
 
 const hoje = new Date().toISOString().split("T")[0]
 
-const emptyClient = {
-  name: "", cpf: "", phone: "", phone_is_whatsapp: false,
-  zip_code: "", street: "", number: "",
-  complement: "", district: "", city: "", state: "",
-  reference_point: "",
-}
-
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function NovoPedidoPage() {
 
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+
   // ── Perfil do usuário logado
-  const [profile,   setProfile]   = useState<UserProfile | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
 
   // ── Dados de referência
-  const [stores,        setStores]        = useState<Store[]>([])
+  const [stores,        setStores]        = useState<StoreOption[]>([])
   const [allEmployees,  setAllEmployees]  = useState<Employee[]>([])
   const [deliveryTimes, setDeliveryTimes] = useState<DeliveryTime[]>([])
   const [loading,       setLoading]       = useState(true)
@@ -87,13 +63,8 @@ export default function NovoPedidoPage() {
   const [searching,      setSearching]      = useState(false)
   const [showDropdown,   setShowDropdown]   = useState(false)
   const [selectedClient, setSelectedClient] = useState<ClientResult | null>(null)
-  const [isNewClient,    setIsNewClient]    = useState(false)
+  const [searchedOnce,   setSearchedOnce]   = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
-
-  // ── Formulário do cliente
-  const [client, setClient] = useState<ClientForm>(emptyClient)
-  const [cepLoading, setCepLoading] = useState(false)
-  const [cepError,   setCepError]   = useState<string | null>(null)
 
   // ── Dados do pedido
   const [urgente,        setUrgente]        = useState(false)
@@ -102,6 +73,13 @@ export default function NovoPedidoPage() {
   const [deliveryTimeId, setDeliveryTimeId] = useState<number | "">("")
   const [dataCompra,     setDataCompra]     = useState(hoje)
   const [dataEntrega,    setDataEntrega]    = useState("")
+  const [osNumero,       setOsNumero]       = useState("")   // Ordem (Shop9)
+  const [osSequencia,    setOsSequencia]    = useState("")   // Sequência (Shop9)
+
+  // ── Submissão
+  const [saving,     setSaving]     = useState(false)
+  const [savingStep, setSavingStep] = useState("")
+  const [error,      setError]      = useState<string | null>(null)
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
 
@@ -110,34 +88,45 @@ export default function NovoPedidoPage() {
     ;(async () => {
       // Perfil do usuário atual
       const { data: { user } } = await sb.auth.getUser()
-      const meta = user?.user_metadata ?? {}
-      const role        = (meta.role        ?? user?.app_metadata?.role ?? "admin") as string
-      const storeIdMeta = meta.store_id     ? Number(meta.store_id)     : null
-      const empIdMeta   = meta.employee_id  ? Number(meta.employee_id)  : null
-      const fullName    = (meta.full_name   ?? user?.email             ?? "") as string
+      const meta        = user?.user_metadata ?? {}
+      const role        = (meta.role       ?? user?.app_metadata?.role ?? "admin") as string
+      const storeIdMeta = meta.store_id    ? Number(meta.store_id)    : null
+      const empIdMeta   = meta.employee_id ? Number(meta.employee_id) : null
+      const fullName    = (meta.full_name  ?? user?.email             ?? "") as string
 
       setProfile({ role, store_id: storeIdMeta, employee_id: empIdMeta, full_name: fullName })
 
-      // Vendedor: pré-preenche loja e funcionário a partir do perfil
-      if (role === "seller" && storeIdMeta)  setStoreId(storeIdMeta)
-      if (role === "seller" && empIdMeta)    setEmployeeId(empIdMeta)
+      if (role === "seller" && storeIdMeta) setStoreId(storeIdMeta)
+      if (role === "seller" && empIdMeta)   setEmployeeId(empIdMeta)
 
-      // Carrega referências em paralelo
       const [sRes, eRes, dRes] = await Promise.all([
         sb.from("stores").select("id, code, name").eq("active", true),
         sb.from("employees").select("id, full_name, short_name, store_id").eq("active", true),
         sb.from("delivery_times").select("id, description, days").eq("active", true).order("days"),
       ])
 
-      if (sRes.data) {
-        setStores([...sRes.data].sort((a, b) =>
-          (parseInt(a.code) || 0) - (parseInt(b.code) || 0),
-        ) as Store[])
-      }
+      if (sRes.data) setStores([...sRes.data].sort((a, b) =>
+        (parseInt(a.code) || 0) - (parseInt(b.code) || 0),
+      ) as StoreOption[])
       if (eRes.data) setAllEmployees(eRes.data as Employee[])
       if (dRes.data) setDeliveryTimes(dRes.data as DeliveryTime[])
       setLoading(false)
+
+      // Auto-seleciona cliente vindo de /clientes/novo?retornar=pedidos/novo
+      const clienteId = searchParams.get("cliente")
+      if (clienteId) {
+        const { data: c } = await sb
+          .from("customers")
+          .select("id, name, cpf, phone")
+          .eq("id", Number(clienteId))
+          .single()
+        if (c) {
+          setSelectedClient(c as ClientResult)
+          setSearchTerm(c.name)
+        }
+      }
     })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Fecha dropdown ao clicar fora
@@ -150,7 +139,7 @@ export default function NovoPedidoPage() {
     return () => document.removeEventListener("mousedown", handle)
   }, [])
 
-  // ─── Funcionários filtrados ─────────────────────────────────────────────────
+  // ─── Funcionários filtrados por loja ────────────────────────────────────────
 
   const employees = storeId
     ? allEmployees
@@ -169,19 +158,17 @@ export default function NovoPedidoPage() {
       setSearching(true)
       const sb = createSupabaseBrowserClient()
 
-      // Normaliza o termo: dígitos puros para buscar CPF com ou sem formatação
-      const digits = searchTerm.replace(/\D/g, "")
+      const digits       = searchTerm.replace(/\D/g, "")
       const cpfFormatado = digits.length === 11
         ? `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9,11)}`
         : null
 
-      // Monta filtros OR: nome, CPF sem formatação, CPF com formatação, telefone
       const filtros = [
         `name.ilike.%${searchTerm}%`,
-        digits.length >= 3 ? `cpf.ilike.%${digits}%` : null,
-        cpfFormatado       ? `cpf.ilike.%${cpfFormatado}%` : null,
+        digits.length >= 3 ? `cpf.ilike.%${digits}%`       : null,
+        cpfFormatado       ? `cpf.ilike.%${cpfFormatado}%`  : null,
         `phone.ilike.%${searchTerm}%`,
-        digits.length >= 3 ? `phone.ilike.%${digits}%` : null,
+        digits.length >= 3 ? `phone.ilike.%${digits}%`      : null,
       ].filter(Boolean).join(",")
 
       const { data, error } = await sb
@@ -193,6 +180,7 @@ export default function NovoPedidoPage() {
         .limit(8)
 
       setSearching(false)
+      setSearchedOnce(true)
       if (error) console.error("Busca de clientes:", error.message)
       setSearchResults((data as ClientResult[]) ?? [])
       setShowDropdown(true)
@@ -200,87 +188,113 @@ export default function NovoPedidoPage() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // ─── CEP auto-fill ──────────────────────────────────────────────────────────
-
-  async function lookupCep(raw: string) {
-    const digits = raw.replace(/\D/g, "")
-    if (digits.length !== 8) return
-    setCepLoading(true)
-    setCepError(null)
-    const d = await buscaCep(digits)
-    setCepLoading(false)
-    if (!d) { setCepError("CEP não encontrado"); return }
-    setClient(f => ({
-      ...f,
-      street:   d.logradouro ?? "",
-      district: d.bairro     ?? "",
-      city:     d.localidade ?? "",
-      state:    d.uf         ?? "",
-    }))
-  }
-
-  function handleCepChange(raw: string) {
-    // Formata enquanto digita: 64000-000
-    const digits = raw.replace(/\D/g, "").slice(0, 8)
-    const formatted = digits.length > 5
-      ? `${digits.slice(0, 5)}-${digits.slice(5)}`
-      : digits
-    setClient(f => ({ ...f, zip_code: formatted }))
-    setCepError(null)
-    // Busca automática ao completar 8 dígitos
-    if (digits.length === 8) lookupCep(digits)
-  }
-
-  // ─── Selecionar cliente existente ───────────────────────────────────────────
+  // ─── Selecionar / limpar cliente ────────────────────────────────────────────
 
   function selectClient(c: ClientResult) {
     setSelectedClient(c)
-    setIsNewClient(false)
     setShowDropdown(false)
     setSearchTerm(c.name)
-    setClient(f => ({
-      ...f,
-      name:  c.name         ?? "",
-      cpf:   c.cpf          ?? "",
-      phone: c.phone        ?? "",
-    }))
   }
 
   function clearClient() {
     setSelectedClient(null)
-    setIsNewClient(false)
     setSearchTerm("")
     setSearchResults([])
-    setClient(emptyClient)
+    setSearchedOnce(false)
   }
 
-  // ─── Regra: CPF ou Telefone — pelo menos um obrigatório ────────────────────
+  // ─── Submissão ──────────────────────────────────────────────────────────────
 
-  const hasCpf   = client.cpf.replace(/\D/g, "").length > 0
-  const hasPhone = client.phone.replace(/\D/g, "").length > 0
+  async function handleSubmit() {
+    if (!selectedClient) {
+      setError("Selecione um cliente.")
+      return
+    }
+    if (!storeId) {
+      setError("Selecione a loja.")
+      return
+    }
+    if (!employeeId) {
+      setError("Selecione o vendedor.")
+      return
+    }
+    if (!osNumero.trim()) {
+      setError("Informe o número da Ordem (Shop9).")
+      return
+    }
+    if (!osSequencia.trim()) {
+      setError("Informe a Sequência (Shop9).")
+      return
+    }
 
-  // Se não tem CPF, telefone vira obrigatório; se não tem telefone, CPF vira obrigatório
-  const cpfRequired   = !hasPhone
-  const phoneRequired = !hasCpf
+    setSaving(true)
+    setError(null)
+    const sb = createSupabaseBrowserClient()
+
+    // 1. Calcula data de entrega prevista
+    let scheduledDelivery: string | null = dataEntrega || null
+    if (!scheduledDelivery && deliveryTimeId) {
+      const dt = deliveryTimes.find(d => d.id === Number(deliveryTimeId))
+      if (dt) {
+        const base = new Date(`${dataCompra}T12:00:00`)
+        base.setDate(base.getDate() + dt.days)
+        scheduledDelivery = base.toISOString().split("T")[0]
+      }
+    }
+
+    // 2. Nome do funcionário (denormalizado)
+    const emp = allEmployees.find(e => e.id === Number(employeeId))
+    const employeeName = emp?.short_name ?? emp?.full_name ?? null
+
+    // 3. Cria o pedido
+    setSavingStep("Cadastrando pedido...")
+    const { data: newOrder, error: orderErr } = await sb
+      .from("service_orders")
+      .insert({
+        os_number:          osNumero.trim(),
+        os_sequence:        osSequencia.trim(),
+        customer_id:        selectedClient.id,
+        customer_name:      selectedClient.name,
+        store_id:           Number(storeId),
+        employee_id:        Number(employeeId),
+        employee_name:      employeeName,
+        purchase_date:      dataCompra || null,
+        scheduled_delivery: scheduledDelivery,
+        urgent:             urgente,
+        situation:          "Compras",
+        source:             "app",
+      })
+      .select("id").single()
+
+    if (orderErr || !newOrder) {
+      setError("Erro ao criar pedido: " + (orderErr?.message ?? "falha desconhecida"))
+      setSaving(false)
+      return
+    }
+
+    // 4. Registra histórico inicial
+    setSavingStep("Registrando histórico...")
+    await sb.from("service_order_histories").insert({
+      service_order_id: newOrder.id,
+      situation:        "Compras",
+      operator_name:    profile?.full_name ?? null,
+    })
+
+    router.push(`/pedidos/${newOrder.id}`)
+  }
 
   // ─── Helpers de UI ──────────────────────────────────────────────────────────
 
   const isSeller = profile?.role === "seller"
 
-  const s0 = { borderColor: "#e2e8f0", color: "#0f172a", background: "#f8fafc" }
+  const s0  = { borderColor: "#e2e8f0", color: "#121212", background: "#f8fafc" }
   const cls = "w-full px-3 py-2.5 rounded-xl text-sm border outline-none transition-colors"
 
-  const label = (txt: string, req = false) => (
+  const lbl = (txt: string, req = false) => (
     <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5"
-      style={{ color: "#64748b" }}>
-      {txt} {req && <span style={{ color: "#dc2626" }}>*</span>}
+      style={{ color: "#556376" }}>
+      {txt}{req && <span style={{ color: "#dc2626" }}> *</span>}
     </label>
-  )
-
-  const inp = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input {...props} className={cls} style={s0}
-      onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
-      onBlur={e  => (e.target.style.borderColor = "#e2e8f0")} />
   )
 
   const sel = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
@@ -302,55 +316,74 @@ export default function NovoPedidoPage() {
 
   return (
     <>
+      {/* ── Overlay de carregamento ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {saving && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: "rgba(15,39,68,0.45)", backdropFilter: "blur(4px)" }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              className="flex flex-col items-center gap-4 px-10 py-8 rounded-2xl"
+              style={{ background: "#fff", boxShadow: "0 20px 60px rgba(15,39,68,0.25)" }}
+            >
+              <Loader2 className="w-10 h-10 animate-spin" style={{ color: "#0f2744" }} />
+              <p className="text-sm font-semibold" style={{ color: "#121212" }}>
+                {savingStep || "Processando..."}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Header breadcrumbs={["Home", "Pedidos", "Novo Pedido"]} title="Novo Pedido" />
 
       <main className="pt-[64px] px-8 py-6 space-y-5">
 
         <Link href="/pedidos" className="inline-flex items-center gap-2 text-sm transition-colors"
-          style={{ color: "#64748b" }}>
+          style={{ color: "#556376" }}>
           <ArrowLeft className="w-4 h-4" /> Voltar para pedidos
         </Link>
 
         <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
 
-          {/* ══════════════════════════════════════════════════════════════════
-              COLUNA 1 — DADOS DO CLIENTE
-          ══════════════════════════════════════════════════════════════════ */}
+          {/* ══ COLUNA 1 — CLIENTE ══════════════════════════════════════════ */}
           {card(
             <>
-              <h2 className="font-bold mb-5" style={{ fontSize: 16, color: "#0f172a" }}>
-                Dados do Cliente
+              <h2 className="font-bold mb-5" style={{ fontSize: 16, color: "#121212" }}>
+                Buscar Cliente
               </h2>
 
-              {/* ── Busca ──────────────────────────────────────────────── */}
-              <div className="mb-5">
-                {label("Buscar Cliente", true)}
-                <div ref={searchRef} className="relative">
+              {/* Busca */}
+              <div ref={searchRef} className="relative mb-4">
+                {lbl("Nome, CPF ou telefone", true)}
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                    style={{ color: "#94a3b8" }} />
+                    style={{ color: "#7e8b9c" }} />
                   <input
                     value={searchTerm}
-                    onChange={e => { setSearchTerm(e.target.value); setSelectedClient(null) }}
+                    onChange={e => { setSearchTerm(e.target.value); if (selectedClient) clearClient() }}
                     onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-                    placeholder="Nome, CPF ou telefone..."
+                    placeholder="Digite para buscar..."
                     className={`${cls} pl-9 pr-9`}
                     style={s0}
                     disabled={!!selectedClient}
                   />
-                  {/* Ícone direito: loading / limpar */}
                   {searching && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin"
-                      style={{ color: "#94a3b8" }} />
+                      style={{ color: "#7e8b9c" }} />
                   )}
                   {selectedClient && (
                     <button onClick={clearClient}
                       className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-                      style={{ color: "#94a3b8" }}>
+                      style={{ color: "#7e8b9c" }}>
                       <X className="w-4 h-4" />
                     </button>
                   )}
 
-                  {/* Dropdown de resultados */}
+                  {/* Dropdown */}
                   <AnimatePresence>
                     {showDropdown && (
                       <motion.div
@@ -359,9 +392,8 @@ export default function NovoPedidoPage() {
                         className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden"
                         style={{ border: "1px solid #e2e8f0",
                           boxShadow: "0 8px 24px rgba(15,39,68,0.10)", background: "#fff" }}>
-
                         {searchResults.length === 0 ? (
-                          <div className="px-4 py-3 text-sm" style={{ color: "#64748b" }}>
+                          <div className="px-4 py-3 text-sm" style={{ color: "#556376" }}>
                             Nenhum cliente encontrado.
                           </div>
                         ) : (
@@ -370,257 +402,109 @@ export default function NovoPedidoPage() {
                               className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:bg-blue-50">
                               <User className="w-4 h-4 flex-shrink-0" style={{ color: "#1d4ed8" }} />
                               <div>
-                                <p className="text-sm font-medium" style={{ color: "#0f172a" }}>{c.name}</p>
-                                <p className="text-xs" style={{ color: "#64748b" }}>
-                                  {c.cpf ?? "—"} · {c.phone ?? "—"}
+                                <p className="text-sm font-medium" style={{ color: "#121212" }}>{c.name}</p>
+                                <p className="text-xs" style={{ color: "#556376" }}>
+                                  {c.cpf ?? "Sem CPF"} · {c.phone ?? "Sem telefone"}
                                 </p>
                               </div>
                             </button>
                           ))
                         )}
-
-                        {/* Botão "Cadastrar novo" */}
-                        <button
-                          onClick={() => {
-                            setIsNewClient(true)
-                            setSelectedClient(null)
-                            setShowDropdown(false)
-                            setClient(f => ({ ...f, name: searchTerm }))
-                          }}
-                          className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors"
-                          style={{ borderTop: "1px solid #e2e8f0", color: "#1d4ed8" }}>
-                          <UserPlus className="w-4 h-4" />
-                          <span className="text-sm font-medium">Cadastrar como novo cliente</span>
-                        </button>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
+              </div>
 
-                {/* Badge cliente selecionado */}
-                {selectedClient && (
-                  <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg"
-                    style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+              {/* Cliente selecionado */}
+              {selectedClient && (
+                <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  className="p-4 rounded-xl space-y-2"
+                  style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                  <div className="flex items-center gap-2">
                     <Check className="w-4 h-4" style={{ color: "#1d4ed8" }} />
-                    <span className="text-sm font-medium" style={{ color: "#1d4ed8" }}>
-                      {selectedClient.name}
-                    </span>
-                    <span className="text-xs ml-1" style={{ color: "#60a5fa" }}>
-                      (cliente existente)
+                    <span className="text-sm font-semibold" style={{ color: "#1d4ed8" }}>
+                      Cliente selecionado
                     </span>
                   </div>
-                )}
+                  <p className="text-sm font-medium" style={{ color: "#121212" }}>
+                    {selectedClient.name}
+                  </p>
+                  <p className="text-xs" style={{ color: "#556376" }}>
+                    {selectedClient.cpf ?? "Sem CPF"} · {selectedClient.phone ?? "Sem telefone"}
+                  </p>
+                </motion.div>
+              )}
 
-                {isNewClient && !selectedClient && (
-                  <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg"
-                    style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                    <UserPlus className="w-4 h-4" style={{ color: "#16a34a" }} />
-                    <span className="text-sm font-medium" style={{ color: "#16a34a" }}>
-                      Novo cliente — preencha os dados abaixo
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Dados básicos ───────────────────────────────────────── */}
-              <div className="space-y-4">
-                <div>
-                  {label("Nome completo", true)}
-                  {inp({
-                    value: client.name,
-                    onChange: e => setClient(f => ({ ...f, name: e.target.value })),
-                    placeholder: "Nome completo do cliente",
-                    readOnly: !!selectedClient,
-                  })}
-                </div>
-
-                <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-                  {/* CPF — obrigatório quando não há telefone */}
-                  <div>
-                    {label("CPF", cpfRequired)}
-                    {inp({
-                      value: client.cpf,
-                      onChange: e => setClient(f => ({ ...f, cpf: e.target.value })),
-                      placeholder: "000.000.000-00",
-                      readOnly: !!selectedClient,
-                      required: cpfRequired,
-                    })}
-                    {!hasCpf && !hasPhone && (
-                      <p className="mt-1 text-xs" style={{ color: "#f59e0b" }}>
-                        Obrigatório na ausência de telefone
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Telefone — obrigatório quando não há CPF */}
-                  <div>
-                    {label("Telefone", phoneRequired)}
-                    {inp({
-                      value: client.phone,
-                      onChange: e => setClient(f => ({ ...f, phone: e.target.value })),
-                      placeholder: "(86) 99999-9999",
-                      readOnly: !!selectedClient,
-                      required: phoneRequired,
-                    })}
-                    {!hasCpf && !hasPhone && (
-                      <p className="mt-1 text-xs" style={{ color: "#f59e0b" }}>
-                        Obrigatório na ausência de CPF
-                      </p>
-                    )}
-                    {/* WhatsApp flag */}
-                    {hasPhone && (
-                      <button
-                        type="button"
-                        onClick={() => setClient(f => ({ ...f, phone_is_whatsapp: !f.phone_is_whatsapp }))}
-                        className="mt-1.5 flex items-center gap-1.5 text-xs transition-colors"
-                        style={{ color: client.phone_is_whatsapp ? "#16a34a" : "#94a3b8" }}
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        <span>{client.phone_is_whatsapp ? "WhatsApp ✓" : "É WhatsApp?"}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* ── Endereço (só para novos clientes ou cliente selecionado) ─── */}
-                {(isNewClient || selectedClient) && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    className="space-y-4 pt-1">
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <MapPin className="w-4 h-4" style={{ color: "#64748b" }} />
-                      <span className="text-xs font-semibold uppercase tracking-wide"
-                        style={{ color: "#64748b" }}>Endereço</span>
-                      <div className="flex-1 h-px" style={{ background: "#e2e8f0" }} />
-                    </div>
-
-                    {/* CEP */}
-                    <div>
-                      {label("CEP", true)}
-                      <div className="relative">
-                        <input
-                          value={client.zip_code}
-                          onChange={e => handleCepChange(e.target.value)}
-                          placeholder="64000-000"
-                          maxLength={9}
-                          required
-                          className={cls}
-                          style={s0}
-                          onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
-                          onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
-                          inputMode="numeric"
-                        />
-                        {cepLoading && (
-                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin"
-                            style={{ color: "#94a3b8" }} />
-                        )}
-                      </div>
-                      {cepError && (
-                        <p className="mt-1 text-xs" style={{ color: "#dc2626" }}>{cepError}</p>
-                      )}
-                    </div>
-
-                    {/* Logradouro + Número */}
-                    <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 100px" }}>
-                      <div>
-                        {label("Logradouro", true)}
-                        {inp({
-                          value: client.street,
-                          onChange: e => setClient(f => ({ ...f, street: e.target.value })),
-                          placeholder: "Rua, Av., Travessa...",
-                          required: true,
-                        })}
-                      </div>
-                      <div>
-                        {label("Nº", true)}
-                        {inp({
-                          value: client.number,
-                          onChange: e => setClient(f => ({ ...f, number: e.target.value })),
-                          placeholder: "123",
-                          required: true,
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Complemento */}
-                    <div>
-                      {label("Complemento")}
-                      {inp({
-                        value: client.complement,
-                        onChange: e => setClient(f => ({ ...f, complement: e.target.value })),
-                        placeholder: "Apto, Bloco, Casa...",
-                      })}
-                    </div>
-
-                    {/* Bairro */}
-                    <div>
-                      {label("Bairro", true)}
-                      {inp({
-                        value: client.district,
-                        onChange: e => setClient(f => ({ ...f, district: e.target.value })),
-                        placeholder: "Bairro",
-                        required: true,
-                      })}
-                    </div>
-
-                    {/* Cidade + UF */}
-                    <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 80px" }}>
-                      <div>
-                        {label("Cidade", true)}
-                        {inp({
-                          value: client.city,
-                          onChange: e => setClient(f => ({ ...f, city: e.target.value })),
-                          placeholder: "Teresina",
-                          required: true,
-                        })}
-                      </div>
-                      <div>
-                        {label("UF", true)}
-                        {inp({
-                          value: client.state,
-                          onChange: e => setClient(f => ({ ...f, state: e.target.value })),
-                          placeholder: "PI",
-                          maxLength: 2,
-                          required: true,
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Ponto de Referência */}
-                    <div>
-                      {label("Ponto de Referência")}
-                      {inp({
-                        value: client.reference_point,
-                        onChange: e => setClient(f => ({ ...f, reference_point: e.target.value })),
-                        placeholder: "Ex: Próximo ao Supermercado X, portão azul...",
-                      })}
-                    </div>
-
-                  </motion.div>
-                )}
-
-              </div>
+              {/* Não encontrado → botão cadastrar */}
+              {searchedOnce && searchResults.length === 0 && !selectedClient && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="mt-3 p-4 rounded-xl"
+                  style={{ background: "#fafafa", border: "1px dashed #cbd5e1" }}>
+                  <p className="text-sm mb-3" style={{ color: "#556376" }}>
+                    Cliente não encontrado na base.
+                  </p>
+                  <Link
+                    href={`/clientes/novo?retornar=pedidos/novo`}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
+                    style={{ background: "#1d4ed8" }}
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Cadastrar Novo Cliente
+                    <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                  </Link>
+                </motion.div>
+              )}
             </>,
             0,
           )}
 
-          {/* ══════════════════════════════════════════════════════════════════
-              COLUNA 2 — DADOS DO PEDIDO
-          ══════════════════════════════════════════════════════════════════ */}
+          {/* ══ COLUNA 2 — DADOS DO PEDIDO ══════════════════════════════════ */}
           {card(
             <>
-              <h2 className="font-bold mb-5" style={{ fontSize: 16, color: "#0f172a" }}>
+              <h2 className="font-bold mb-5" style={{ fontSize: 16, color: "#121212" }}>
                 Dados do Pedido
               </h2>
 
               <div className="space-y-4">
 
-                {/* ── Loja ──────────────────────────────────────────────── */}
+                {/* Ordem e Sequência (Shop9) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    {lbl("Ordem (Shop9)", true)}
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className={cls} style={s0}
+                      placeholder="Ex: 8519"
+                      maxLength={10}
+                      value={osNumero}
+                      onChange={e => setOsNumero(e.target.value.replace(/\D/g, ""))}
+                      onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
+                      onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
+                    />
+                  </div>
+                  <div>
+                    {lbl("Sequência (Shop9)", true)}
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className={cls} style={s0}
+                      placeholder="Ex: 17635"
+                      maxLength={10}
+                      value={osSequencia}
+                      onChange={e => setOsSequencia(e.target.value.replace(/\D/g, ""))}
+                      onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
+                      onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
+                    />
+                  </div>
+                </div>
+
+                {/* Loja */}
                 <div>
-                  {label("Loja", true)}
+                  {lbl("Loja", true)}
                   {isSeller && profile?.store_id ? (
-                    // Vendedor: exibe apenas o nome da loja (read-only)
-                    <div className={cls} style={{ ...s0, color: "#475569" }}>
+                    <div className={cls} style={{ ...s0, color: "#3c4859" }}>
                       {stores.find(s => s.id === profile.store_id)?.name ?? "—"}
                     </div>
                   ) : (
@@ -643,12 +527,11 @@ export default function NovoPedidoPage() {
                   )}
                 </div>
 
-                {/* ── Vendedor ──────────────────────────────────────────── */}
+                {/* Vendedor */}
                 <div>
-                  {label("Vendedor", true)}
+                  {lbl("Vendedor", true)}
                   {isSeller && profile?.employee_id ? (
-                    // Vendedor: exibe seu próprio nome (read-only)
-                    <div className={cls} style={{ ...s0, color: "#475569" }}>
+                    <div className={cls} style={{ ...s0, color: "#3c4859" }}>
                       {allEmployees.find(e => e.id === profile.employee_id)?.short_name
                         ?? allEmployees.find(e => e.id === profile.employee_id)?.full_name
                         ?? profile.full_name}
@@ -658,10 +541,7 @@ export default function NovoPedidoPage() {
                       value: employeeId,
                       onChange: e => setEmployeeId(e.target.value ? Number(e.target.value) : ""),
                       disabled: loading || !storeId,
-                      style: {
-                        ...s0,
-                        color: !storeId && !loading ? "#94a3b8" : "#0f172a",
-                      },
+                      style: { ...s0, color: !storeId && !loading ? "#7e8b9c" : "#121212" },
                       children: (
                         <>
                           <option value="">
@@ -682,9 +562,9 @@ export default function NovoPedidoPage() {
                   )}
                 </div>
 
-                {/* ── Prazo de Entrega ──────────────────────────────────── */}
+                {/* Prazo de Entrega */}
                 <div>
-                  {label("Prazo de Entrega", true)}
+                  {lbl("Prazo de Entrega")}
                   {sel({
                     value: deliveryTimeId,
                     onChange: e => setDeliveryTimeId(e.target.value ? Number(e.target.value) : ""),
@@ -702,34 +582,32 @@ export default function NovoPedidoPage() {
                   })}
                 </div>
 
-                {/* ── Data da Compra ────────────────────────────────────── */}
+                {/* Data da Compra */}
                 <div>
-                  {label("Data da Compra", true)}
+                  {lbl("Data da Compra", true)}
                   <input
                     type="date"
-                    className={cls}
-                    style={s0}
+                    className={cls} style={s0}
                     value={dataCompra}
                     min={isSeller ? primeiroDiaMes : undefined}
-                    max={isSeller ? hoje : undefined}
+                    max={isSeller ? hoje           : undefined}
                     onChange={e => setDataCompra(e.target.value)}
                     onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                     onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                   />
                   {isSeller && (
-                    <p className="mt-1 text-xs" style={{ color: "#94a3b8" }}>
+                    <p className="mt-1 text-xs" style={{ color: "#7e8b9c" }}>
                       Permitido apenas no mês atual
                     </p>
                   )}
                 </div>
 
-                {/* ── Data Prevista de Entrega ──────────────────────────── */}
+                {/* Data Prevista de Entrega */}
                 <div>
-                  {label("Data Prevista de Entrega")}
+                  {lbl("Data Prevista de Entrega")}
                   <input
                     type="date"
-                    className={cls}
-                    style={s0}
+                    className={cls} style={s0}
                     value={dataEntrega}
                     min={dataCompra || hoje}
                     onChange={e => setDataEntrega(e.target.value)}
@@ -738,9 +616,9 @@ export default function NovoPedidoPage() {
                   />
                 </div>
 
-                {/* ── Urgente ───────────────────────────────────────────── */}
+                {/* Urgente */}
                 <div>
-                  {label("Pedido Urgente")}
+                  {lbl("Pedido Urgente")}
                   <button
                     type="button"
                     onClick={() => setUrgente(!urgente)}
@@ -760,7 +638,7 @@ export default function NovoPedidoPage() {
                     <div className="flex items-center gap-1.5">
                       {urgente && <Flame className="w-4 h-4" style={{ color: "#dc2626" }} />}
                       <span className="text-sm font-medium"
-                        style={{ color: urgente ? "#dc2626" : "#475569" }}>
+                        style={{ color: urgente ? "#dc2626" : "#3c4859" }}>
                         {urgente ? "Pedido marcado como urgente" : "Marcar como urgente"}
                       </span>
                     </div>
@@ -774,22 +652,34 @@ export default function NovoPedidoPage() {
 
         </div>
 
-        {/* ── Rodapé ──────────────────────────────────────────────────────── */}
+        {/* Rodapé */}
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
-          className="flex items-center justify-end gap-4 py-2"
+          className="space-y-3"
         >
-          <Link href="/pedidos" className="text-sm" style={{ color: "#64748b" }}>
-            Cancelar
-          </Link>
-          <motion.button
-            whileHover={{ scale: 1.02, boxShadow: "0 4px 16px rgba(15,39,68,0.25)" }}
-            whileTap={{ scale: 0.98 }}
-            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white"
-            style={{ background: "#0f2744" }}
-          >
-            Cadastrar Pedido
-          </motion.button>
+          {error && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
+              style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626" }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-4 py-2">
+            <Link href="/pedidos" className="text-sm" style={{ color: "#556376" }}>
+              Cancelar
+            </Link>
+            <motion.button
+              whileHover={{ scale: saving ? 1 : 1.02, boxShadow: saving ? "none" : "0 4px 16px rgba(15,39,68,0.25)" }}
+              whileTap={{ scale: saving ? 1 : 0.98 }}
+              onClick={handleSubmit}
+              disabled={saving}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white"
+              style={{ background: "#0f2744", opacity: saving ? 0.7 : 1, cursor: saving ? "not-allowed" : "pointer" }}
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? "Salvando..." : "Cadastrar Pedido"}
+            </motion.button>
+          </div>
         </motion.div>
 
       </main>

@@ -1,48 +1,48 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
 import {
-  ArrowLeft, Search, User, X, Check, Loader2,
-  ShoppingBag, Calendar, Store, Clock, AlertTriangle,
+  ArrowLeft, Search, User, X, Check, Loader2, AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { fmtOs, fmtDate } from "@/lib/types"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface ClientResult {
-  id: number
-  name: string
+  id:    number
+  name:  string
   cpf:   string | null
   phone: string | null
 }
 
-interface WarrantyProblem { id: number; name: string }
-interface StoreOption     { id: number; code: string; name: string }
+interface StoreOption    { id: number; code: string; name: string }
+interface EmployeeOption { id: number; full_name: string; short_name: string | null; store_id: number | null }
 
-interface OrderHistory {
-  id:        number
-  os:        string
-  loja:      string
-  data:      string
-  prazo:     string
-  situacao:  string
-}
+// Serviços disponíveis (PHP TB_Solicitation_Services)
+const SERVICOS = ["Ajustes", "Aplique", "Copiar grau", "Montagem", "Transposição"]
+
+// Tipos de armação (frame_type)
+const TIPOS_ARMACAO = ["Completa", "Fio de nylon", "Parafusada", "Sem aro"]
+
+// Situação inicial de uma nova solicitação
+const SITUACAO_INICIAL = "Recebido no laboratório"
+
+const hoje = new Date().toISOString().split("T")[0]
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export default function NovaGarantiaPage() {
+export default function NovaSolicitacaoPage() {
 
   const router = useRouter()
 
   // ── Referências
-  const [problems, setProblems] = useState<WarrantyProblem[]>([])
-  const [stores,   setStores]   = useState<StoreOption[]>([])
-  const [loadingRef, setLoadingRef] = useState(true)
+  const [stores,       setStores]       = useState<StoreOption[]>([])
+  const [allEmployees, setAllEmployees] = useState<EmployeeOption[]>([])
+  const [loadingRef,   setLoadingRef]   = useState(true)
 
   // ── Busca de cliente
   const [searchTerm,     setSearchTerm]     = useState("")
@@ -52,17 +52,14 @@ export default function NovaGarantiaPage() {
   const [selectedClient, setSelectedClient] = useState<ClientResult | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
 
-  // ── Formulário da garantia
-  const [pedidoOs,       setPedidoOs]       = useState("")
-  const [serviceOrderId, setServiceOrderId] = useState<number | null>(null)
-  const [problemaId,     setProblemaId]     = useState("")
-  const [lojaId,         setLojaId]         = useState("")
-  const [descricao,      setDescricao]      = useState("")
-  const [dataAbertura,   setDataAbertura]   = useState(new Date().toISOString().split("T")[0])
-
-  // ── Histórico do cliente selecionado
-  const [history,      setHistory]      = useState<OrderHistory[]>([])
-  const [loadingHist,  setLoadingHist]  = useState(false)
+  // ── Formulário
+  const [storeId,      setStoreId]      = useState<number | "">("")
+  const [employeeId,   setEmployeeId]   = useState<number | "">("")
+  const [serviceType,  setServiceType]  = useState("")
+  const [frameType,    setFrameType]    = useState("")
+  const [frameModel,   setFrameModel]   = useState("")
+  const [dataEntrega,  setDataEntrega]  = useState("")
+  const [notes,        setNotes]        = useState("")
 
   // ── Submissão
   const [saving,     setSaving]     = useState(false)
@@ -74,15 +71,15 @@ export default function NovaGarantiaPage() {
   useEffect(() => {
     const sb = createSupabaseBrowserClient()
     Promise.all([
-      sb.from("warranty_problems").select("id, name").eq("active", true).order("name"),
       sb.from("stores").select("id, code, name").eq("active", true),
-    ]).then(([pRes, sRes]) => {
-      if (pRes.data) setProblems(pRes.data as WarrantyProblem[])
+      sb.from("employees").select("id, full_name, short_name, store_id").eq("active", true),
+    ]).then(([sRes, eRes]) => {
       if (sRes.data) setStores(
         [...sRes.data].sort((a, b) =>
           (parseInt(a.code) || 0) - (parseInt(b.code) || 0),
         ) as StoreOption[],
       )
+      if (eRes.data) setAllEmployees(eRes.data as EmployeeOption[])
       setLoadingRef(false)
     })
   }, [])
@@ -102,15 +99,17 @@ export default function NovaGarantiaPage() {
 
   useEffect(() => {
     if (searchTerm.length < 2) { setSearchResults([]); setShowDropdown(false); return }
-    const digits  = searchTerm.replace(/\D/g, "")
-    const cpfFmt  = digits.length === 11
+
+    const digits   = searchTerm.replace(/\D/g, "")
+    const cpfFmt   = digits.length === 11
       ? `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9,11)}`
       : null
-    const filtros = [
+    const filtros  = [
       `name.ilike.%${searchTerm}%`,
-      digits.length >= 2 ? `cpf.ilike.%${digits}%` : null,
-      cpfFmt             ? `cpf.ilike.%${cpfFmt}%` : null,
+      digits.length >= 2 ? `cpf.ilike.%${digits}%`  : null,
+      cpfFmt             ? `cpf.ilike.%${cpfFmt}%`   : null,
       `phone.ilike.%${searchTerm}%`,
+      digits.length >= 2 ? `phone.ilike.%${digits}%` : null,
     ].filter(Boolean).join(",")
 
     const timer = setTimeout(async () => {
@@ -130,44 +129,27 @@ export default function NovaGarantiaPage() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // ─── Selecionar cliente e carregar histórico ────────────────────────────────
+  // ─── Helpers ────────────────────────────────────────────────────────────────
 
-  async function selectClient(c: ClientResult) {
+  const employees = storeId
+    ? allEmployees
+        .filter(e => e.store_id === Number(storeId))
+        .sort((a, b) =>
+          (a.short_name ?? a.full_name).toLowerCase()
+            .localeCompare((b.short_name ?? b.full_name).toLowerCase(), "pt-BR"),
+        )
+    : []
+
+  function selectClient(c: ClientResult) {
     setSelectedClient(c)
     setShowDropdown(false)
     setSearchTerm(c.name)
-    setPedidoOs("")
-    setServiceOrderId(null)
-
-    setLoadingHist(true)
-    const sb = createSupabaseBrowserClient()
-    const { data } = await sb
-      .from("service_orders")
-      .select("id, os_number, os_sequence, situation, purchase_date, scheduled_delivery, store:stores(code,name)")
-      .eq("customer_id", c.id)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(10)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setHistory((data ?? []).map((o: any) => ({
-      id:       o.id,
-      os:       fmtOs(o.os_number, o.os_sequence),
-      loja:     o.store ? `${o.store.code} — ${o.store.name}` : "—",
-      data:     fmtDate(o.purchase_date),
-      prazo:    fmtDate(o.scheduled_delivery),
-      situacao: o.situation ?? "—",
-    })))
-    setLoadingHist(false)
   }
 
   function clearClient() {
     setSelectedClient(null)
     setSearchTerm("")
     setSearchResults([])
-    setHistory([])
-    setPedidoOs("")
-    setServiceOrderId(null)
   }
 
   // ─── Submissão ──────────────────────────────────────────────────────────────
@@ -177,50 +159,59 @@ export default function NovaGarantiaPage() {
       setError("Selecione um cliente.")
       return
     }
-    if (!problemaId) {
-      setError("Selecione o tipo de problema.")
+    if (!serviceType) {
+      setError("Selecione o tipo de serviço.")
       return
     }
-    if (!lojaId) {
+    if (!storeId) {
       setError("Selecione a loja.")
+      return
+    }
+    if (!employeeId) {
+      setError("Selecione o vendedor.")
       return
     }
 
     setSaving(true)
-    setSavingStep("Abrindo garantia...")
+    setSavingStep("Criando solicitação...")
     setError(null)
     const sb = createSupabaseBrowserClient()
 
-    const { data: newWarranty, error: wErr } = await sb
-      .from("warranties")
+    const emp = allEmployees.find(e => e.id === Number(employeeId))
+
+    const { data: newRequest, error: rErr } = await sb
+      .from("requests")
       .insert({
-        customer_name:    selectedClient.name,
-        customer_cpf:     selectedClient.cpf?.replace(/\D/g, "") || null,
-        service_order_id: serviceOrderId,
-        problem_id:       Number(problemaId),
-        store_id:         Number(lojaId),
-        situation:        "Solicitação Criada",
-        request_date:     dataAbertura || null,
-        notes:            descricao.trim() || null,
-        source:           "app",
+        customer_id:        selectedClient.id,
+        customer_name:      selectedClient.name,
+        customer_cpf:       selectedClient.cpf?.replace(/\D/g, "") || null,
+        customer_phone:     selectedClient.phone?.replace(/\D/g, "") || null,
+        store_id:           Number(storeId),
+        employee_id:        Number(employeeId),
+        service_type:       serviceType,
+        frame_type:         frameType || null,
+        frame_model:        frameModel.trim() || null,
+        situation:          SITUACAO_INICIAL,
+        scheduled_delivery: dataEntrega || null,
+        notes:              notes.trim() || null,
       })
       .select("id").single()
 
-    if (wErr || !newWarranty) {
-      setError("Erro ao criar garantia: " + (wErr?.message ?? "falha desconhecida"))
+    if (rErr || !newRequest) {
+      setError("Erro ao criar solicitação: " + (rErr?.message ?? "falha desconhecida"))
       setSaving(false)
       return
     }
 
     // Registra histórico inicial
     setSavingStep("Registrando histórico...")
-    await sb.from("warranty_histories").insert({
-      warranty_id:   newWarranty.id,
-      situation:     "Solicitação Criada",
-      source:        "manual",
+    await sb.from("request_histories").insert({
+      request_id:    newRequest.id,
+      situation:     SITUACAO_INICIAL,
+      operator_name: emp?.short_name ?? emp?.full_name ?? null,
     })
 
-    router.push(`/garantias/${newWarranty.id}`)
+    router.push(`/solicitacoes/${newRequest.id}`)
   }
 
   // ─── Helpers de UI ──────────────────────────────────────────────────────────
@@ -282,13 +273,13 @@ export default function NovaGarantiaPage() {
         )}
       </AnimatePresence>
 
-      <Header breadcrumbs={["Home", "Garantias", "Nova Garantia"]} title="Nova Garantia" />
+      <Header breadcrumbs={["Home", "Solicitações", "Nova Solicitação"]} title="Nova Solicitação" />
 
       <main className="pt-[64px] px-8 py-6 space-y-5">
 
-        <Link href="/garantias" className="inline-flex items-center gap-2 text-sm"
+        <Link href="/solicitacoes" className="inline-flex items-center gap-2 text-sm"
           style={{ color: "#556376" }}>
-          <ArrowLeft className="w-4 h-4" /> Voltar para garantias
+          <ArrowLeft className="w-4 h-4" /> Voltar para solicitações
         </Link>
 
         <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
@@ -297,28 +288,29 @@ export default function NovaGarantiaPage() {
           {card(
             <>
               <h2 className="font-bold mb-5" style={{ fontSize: 16, color: "#121212" }}>
-                Buscar Cliente
+                Dados do Cliente
               </h2>
 
               {/* Busca */}
-              <div className="mb-5">
-                {lbl("Nome ou CPF", true)}
-                <div ref={searchRef} className="relative">
+              <div ref={searchRef} className="relative mb-5">
+                {lbl("Buscar Cliente", true)}
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
                     style={{ color: "#7e8b9c" }} />
                   <input
                     value={searchTerm}
                     onChange={e => { setSearchTerm(e.target.value); if (selectedClient) clearClient() }}
                     onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-                    placeholder="Digite o nome ou CPF do cliente..."
+                    placeholder="Nome, CPF ou telefone..."
                     className={`${cls} pl-9 pr-9`}
                     style={s0}
+                    disabled={!!selectedClient}
                   />
                   {searching && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin"
                       style={{ color: "#7e8b9c" }} />
                   )}
-                  {selectedClient && !searching && (
+                  {selectedClient && (
                     <button onClick={clearClient}
                       className="absolute right-3 top-1/2 -translate-y-1/2"
                       style={{ color: "#7e8b9c" }}>
@@ -372,116 +364,86 @@ export default function NovaGarantiaPage() {
                 )}
               </div>
 
-              {/* Histórico de pedidos */}
-              {(selectedClient || loadingHist) && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <ShoppingBag className="w-4 h-4" style={{ color: "#556376" }} />
-                    <span className="text-xs font-semibold uppercase tracking-wide"
-                      style={{ color: "#556376" }}>
-                      Histórico de Pedidos
-                    </span>
-                    <div className="flex-1 h-px" style={{ background: "#e2e8f0" }} />
+              {/* Info do cliente selecionado */}
+              {selectedClient && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="space-y-3 pt-2">
+                  <div>
+                    {lbl("Nome")}
+                    <div className={cls} style={{ ...s0, color: "#3c4859" }}>
+                      {selectedClient.name}
+                    </div>
                   </div>
-
-                  {loadingHist ? (
-                    <div className="flex items-center gap-2 py-4" style={{ color: "#7e8b9c" }}>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Carregando histórico...</span>
+                  <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                    <div>
+                      {lbl("CPF")}
+                      <div className={cls} style={{ ...s0, color: "#3c4859" }}>
+                        {selectedClient.cpf ?? "—"}
+                      </div>
                     </div>
-                  ) : history.length === 0 ? (
-                    <p className="text-sm py-3" style={{ color: "#7e8b9c" }}>
-                      Nenhum pedido encontrado para este cliente.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {history.map(h => (
-                        <button
-                          key={h.id}
-                          onClick={() => { setPedidoOs(h.os); setServiceOrderId(h.id) }}
-                          className="w-full text-left p-3 rounded-xl border transition-all"
-                          style={{
-                            borderColor: pedidoOs === h.os ? "#1d4ed8" : "#e2e8f0",
-                            background:  pedidoOs === h.os ? "#eff6ff"  : "#f8fafc",
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono font-bold text-xs" style={{ color: "#1d4ed8" }}>
-                              {h.os}
-                            </span>
-                            <span
-                              className="text-xs px-2 py-0.5 rounded-full font-medium"
-                              style={{
-                                background: h.situacao === "Entregue" ? "#dcfce7" : "#fee2e2",
-                                color:      h.situacao === "Entregue" ? "#16a34a" : "#dc2626",
-                              }}
-                            >
-                              {h.situacao}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1.5">
-                            <div className="flex items-center gap-1 text-xs" style={{ color: "#556376" }}>
-                              <Store className="w-3 h-3" />
-                              {h.loja}
-                            </div>
-                            <div className="flex items-center gap-1 text-xs" style={{ color: "#556376" }}>
-                              <Calendar className="w-3 h-3" />
-                              {h.data}
-                            </div>
-                            <div className="flex items-center gap-1 text-xs" style={{ color: "#556376" }}>
-                              <Clock className="w-3 h-3" />
-                              Entrega: {h.prazo}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                    <div>
+                      {lbl("Telefone")}
+                      <div className={cls} style={{ ...s0, color: "#3c4859" }}>
+                        {selectedClient.phone ?? "—"}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </motion.div>
               )}
             </>,
             0,
           )}
 
-          {/* ══ COLUNA 2 — DADOS DA GARANTIA ══════════════════════════════ */}
+          {/* ══ COLUNA 2 — DADOS DA SOLICITAÇÃO ═══════════════════════════ */}
           {card(
             <>
               <h2 className="font-bold mb-5" style={{ fontSize: 16, color: "#121212" }}>
-                Dados da Garantia
+                Dados da Solicitação
               </h2>
 
               <div className="space-y-4">
 
-                {/* Pedido vinculado */}
+                {/* Serviço */}
                 <div>
-                  {lbl("Pedido / OS vinculado", true)}
-                  {inp({
-                    value: pedidoOs,
-                    onChange: e => setPedidoOs(e.target.value),
-                    placeholder: "Ex: 63210/48957 — ou selecione ao lado",
-                  })}
-                  {pedidoOs && (
-                    <p className="mt-1 text-xs" style={{ color: "#16a34a" }}>
-                      ✓ OS selecionada do histórico
-                    </p>
-                  )}
-                </div>
-
-                {/* Problema */}
-                <div>
-                  {lbl("Tipo de Problema", true)}
+                  {lbl("Tipo de Serviço", true)}
                   {sel({
-                    value: problemaId,
-                    onChange: e => setProblemaId(e.target.value),
-                    disabled: loadingRef,
+                    value: serviceType,
+                    onChange: e => setServiceType(e.target.value),
                     children: (
                       <>
-                        <option value="">{loadingRef ? "Carregando..." : "Selecione o problema..."}</option>
-                        {problems.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
+                        <option value="">Selecione o serviço...</option>
+                        {SERVICOS.map(s => (
+                          <option key={s} value={s}>{s}</option>
                         ))}
                       </>
                     ),
+                  })}
+                </div>
+
+                {/* Tipo de armação */}
+                <div>
+                  {lbl("Tipo de Armação")}
+                  {sel({
+                    value: frameType,
+                    onChange: e => setFrameType(e.target.value),
+                    children: (
+                      <>
+                        <option value="">Selecione (opcional)...</option>
+                        {TIPOS_ARMACAO.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </>
+                    ),
+                  })}
+                </div>
+
+                {/* Modelo/Referência da armação */}
+                <div>
+                  {lbl("Modelo / Referência da Armação")}
+                  {inp({
+                    value: frameModel,
+                    onChange: e => setFrameModel(e.target.value),
+                    placeholder: "Ex: Ray-Ban RB5228, Vogue VO5091...",
                   })}
                 </div>
 
@@ -489,8 +451,11 @@ export default function NovaGarantiaPage() {
                 <div>
                   {lbl("Loja", true)}
                   {sel({
-                    value: lojaId,
-                    onChange: e => setLojaId(e.target.value),
+                    value: storeId,
+                    onChange: e => {
+                      setStoreId(e.target.value ? Number(e.target.value) : "")
+                      setEmployeeId("")
+                    },
                     disabled: loadingRef,
                     children: (
                       <>
@@ -503,27 +468,56 @@ export default function NovaGarantiaPage() {
                   })}
                 </div>
 
-                {/* Data abertura */}
+                {/* Vendedor */}
                 <div>
-                  {lbl("Data de Abertura", true)}
+                  {lbl("Vendedor(a)", true)}
+                  {sel({
+                    value: employeeId,
+                    onChange: e => setEmployeeId(e.target.value ? Number(e.target.value) : ""),
+                    disabled: loadingRef || !storeId,
+                    style: { ...s0, color: !storeId && !loadingRef ? "#7e8b9c" : "#121212" },
+                    children: (
+                      <>
+                        <option value="">
+                          {loadingRef ? "Carregando..." : !storeId
+                            ? "Selecione a loja primeiro..."
+                            : employees.length === 0
+                              ? "Nenhum vendedor nesta loja"
+                              : "Selecione o vendedor..."}
+                        </option>
+                        {employees.map(e => (
+                          <option key={e.id} value={e.id}>
+                            {e.short_name ?? e.full_name}
+                          </option>
+                        ))}
+                      </>
+                    ),
+                  })}
+                </div>
+
+                {/* Data prevista de entrega */}
+                <div>
+                  {lbl("Data Prevista de Entrega")}
                   <input
                     type="date"
-                    value={dataAbertura}
-                    onChange={e => setDataAbertura(e.target.value)}
-                    className={cls} style={s0}
+                    value={dataEntrega}
+                    min={hoje}
+                    onChange={e => setDataEntrega(e.target.value)}
+                    className={cls}
+                    style={s0}
                     onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                     onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                   />
                 </div>
 
-                {/* Descrição */}
+                {/* Observações */}
                 <div>
-                  {lbl("Descrição do Problema")}
+                  {lbl("Observações")}
                   <textarea
-                    rows={4}
-                    value={descricao}
-                    onChange={e => setDescricao(e.target.value)}
-                    placeholder="Descreva o problema relatado pelo cliente..."
+                    rows={3}
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    placeholder="Observações sobre a solicitação..."
                     className={`${cls} resize-none`}
                     style={s0}
                     onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
@@ -551,7 +545,7 @@ export default function NovaGarantiaPage() {
             </div>
           )}
           <div className="flex items-center justify-end gap-4 py-2">
-            <Link href="/garantias" className="text-sm" style={{ color: "#556376" }}>
+            <Link href="/solicitacoes" className="text-sm" style={{ color: "#556376" }}>
               Cancelar
             </Link>
             <motion.button
@@ -563,7 +557,7 @@ export default function NovaGarantiaPage() {
               style={{ background: "#0f2744", opacity: saving ? 0.7 : 1, cursor: saving ? "not-allowed" : "pointer" }}
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? "Salvando..." : "Abrir Garantia"}
+              {saving ? "Salvando..." : "Criar Solicitação"}
             </motion.button>
           </div>
         </motion.div>

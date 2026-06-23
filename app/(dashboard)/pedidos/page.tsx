@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -249,7 +249,7 @@ export default function PedidosPage() {
     transition-colors cursor-pointer
   `.trim()
   const selStyle = {
-    borderColor: "#e2e8f0", color: "#475569",
+    borderColor: "#e2e8f0", color: "#3c4859",
     background: "#f8fafc url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\") no-repeat right 8px center",
   }
 
@@ -280,14 +280,14 @@ export default function PedidosPage() {
             <Link href="/pedidos/codigo-de-barras">
               <motion.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer"
-                style={{ background: "#fff", borderColor: "#e2e8f0", color: "#475569" }}>
+                style={{ background: "#fff", borderColor: "#e2e8f0", color: "#3c4859" }}>
                 <Barcode className="w-4 h-4" /> Código de Barras
               </motion.span>
             </Link>
             <Link href="/pedidos/busca-avancada">
               <motion.span whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border cursor-pointer"
-                style={{ background: "#fff", borderColor: "#e2e8f0", color: "#475569" }}>
+                style={{ background: "#fff", borderColor: "#e2e8f0", color: "#3c4859" }}>
                 <Search className="w-4 h-4" /> Busca Avançada
               </motion.span>
             </Link>
@@ -309,7 +309,7 @@ export default function PedidosPage() {
           className="rounded-xl p-4 border flex items-center gap-3 flex-wrap"
           style={{ background: "#fff", borderColor: "#e2e8f0" }}
         >
-          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#94a3b8" }} />
+          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#7e8b9c" }} />
 
           {/* Mês */}
           <input
@@ -317,7 +317,7 @@ export default function PedidosPage() {
             value={monthFilter}
             onChange={e => { setMonthFilter(e.target.value); setCurrentPage(1) }}
             className="pl-3 pr-2 py-1.5 rounded-lg text-sm border outline-none transition-colors"
-            style={{ borderColor: "#e2e8f0", color: "#475569", background: "#f8fafc" }}
+            style={{ borderColor: "#e2e8f0", color: "#3c4859", background: "#f8fafc" }}
             onFocus={e => (e.target.style.borderColor = "#93c5fd")}
             onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
           />
@@ -370,14 +370,14 @@ export default function PedidosPage() {
           {/* Busca cliente com autocomplete */}
           <div ref={searchRef} className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
-              style={{ color: "#94a3b8" }} />
+              style={{ color: "#7e8b9c" }} />
             <input
               value={clientSearch}
               onChange={e => { setClientSearch(e.target.value); setSelectedClient(null) }}
               onFocus={() => clientHints.length > 0 && setShowHints(true)}
               placeholder="Buscar cliente..."
               className="w-full pl-9 pr-8 py-1.5 rounded-lg text-sm border outline-none transition-colors"
-              style={{ borderColor: "#e2e8f0", color: "#0f172a", background: "#f8fafc" }}
+              style={{ borderColor: "#e2e8f0", color: "#121212", background: "#f8fafc" }}
               onFocusCapture={e => (e.target.style.borderColor = "#1d4ed8")}
               onBlurCapture={e  => (e.target.style.borderColor = "#e2e8f0")}
             />
@@ -389,7 +389,7 @@ export default function PedidosPage() {
             {selectedClient && !searching && (
               <button onClick={clearClientSearch}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 transition-colors"
-                style={{ color: "#94a3b8" }}>
+                style={{ color: "#7e8b9c" }}>
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -406,8 +406,8 @@ export default function PedidosPage() {
                     <button key={c.id} onClick={() => selectClient(c)}
                       className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors hover:bg-blue-50">
                       <div>
-                        <p className="text-sm font-medium" style={{ color: "#0f172a" }}>{c.name}</p>
-                        {c.cpf && <p className="text-xs" style={{ color: "#94a3b8" }}>{c.cpf}</p>}
+                        <p className="text-sm font-medium" style={{ color: "#121212" }}>{c.name}</p>
+                        {c.cpf && <p className="text-xs" style={{ color: "#7e8b9c" }}>{c.cpf}</p>}
                       </div>
                     </button>
                   ))}
@@ -423,9 +423,9 @@ export default function PedidosPage() {
               clearClientSearch()
             }}
             className="text-sm transition-colors"
-            style={{ color: "#94a3b8" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#475569")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#94a3b8")}
+            style={{ color: "#7e8b9c" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#3c4859")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#7e8b9c")}
           >
             Limpar
           </button>
@@ -442,7 +442,7 @@ export default function PedidosPage() {
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                 {["ID", "Pedido", "Cliente", "Vendedor(a)", "Entrega", "Status", "Ações"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: "#64748b" }}>
+                    style={{ color: "#556376" }}>
                     <div className="flex items-center gap-1">
                       {h}
                       {["ID", "Pedido", "Entrega"].includes(h) && (
@@ -466,7 +466,7 @@ export default function PedidosPage() {
                 ))
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm" style={{ color: "#94a3b8" }}>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm" style={{ color: "#7e8b9c" }}>
                     Nenhum pedido encontrado com os filtros aplicados.
                   </td>
                 </tr>
@@ -493,7 +493,7 @@ export default function PedidosPage() {
                       >
                         {/* ID */}
                         <td className="px-4 py-3 w-16">
-                          <span className="font-bold text-sm" style={{ color: "#0f172a" }}>
+                          <span className="font-bold text-sm" style={{ color: "#121212" }}>
                             {displayId}
                           </span>
                         </td>
@@ -511,18 +511,18 @@ export default function PedidosPage() {
                               </span>
                             )}
                           </Link>
-                          <span className="text-xs block mt-0.5" style={{ color: "#94a3b8" }}>
+                          <span className="text-xs block mt-0.5" style={{ color: "#7e8b9c" }}>
                             {fmtDate(o.purchase_date)}
                           </span>
                         </td>
 
                         {/* CLIENTE: nome + CPF */}
                         <td className="px-4 py-3">
-                          <span className="font-medium text-sm block" style={{ color: "#0f172a" }}>
+                          <span className="font-medium text-sm block" style={{ color: "#121212" }}>
                             {o.customer_name ?? "—"}
                           </span>
                           {o.customer_cpf && (
-                            <span className="text-xs block mt-0.5" style={{ color: "#94a3b8" }}>
+                            <span className="text-xs block mt-0.5" style={{ color: "#7e8b9c" }}>
                               {o.customer_cpf}
                             </span>
                           )}
@@ -530,11 +530,11 @@ export default function PedidosPage() {
 
                         {/* VENDEDOR(A): nome + loja */}
                         <td className="px-4 py-3">
-                          <span className="text-sm font-medium block" style={{ color: "#475569" }}>
+                          <span className="text-sm font-medium block" style={{ color: "#3c4859" }}>
                             {o.employee_name ?? "—"}
                           </span>
                           {o.store_code && (
-                            <span className="text-xs block mt-0.5" style={{ color: "#94a3b8" }}>
+                            <span className="text-xs block mt-0.5" style={{ color: "#7e8b9c" }}>
                               {o.store_code} — {o.store_name}
                             </span>
                           )}
@@ -551,7 +551,7 @@ export default function PedidosPage() {
                               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#dc2626" }} />
                             )}
                             <span className="text-xs" style={{
-                              color: prazoOkV ? "#475569" : "#dc2626",
+                              color: prazoOkV ? "#3c4859" : "#dc2626",
                               fontWeight: prazoOkV ? 400 : 600,
                             }}>
                               {fmtDate(o.scheduled_delivery)}
@@ -563,9 +563,9 @@ export default function PedidosPage() {
                         <td className="px-4 py-3">
                           {sit !== "—"
                             ? <StatusBadge status={sit} size="sm" />
-                            : <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>
+                            : <span style={{ fontSize: 12, color: "#7e8b9c" }}>—</span>
                           }
-                          <span className="text-xs block mt-0.5" style={{ color: "#94a3b8" }}>
+                          <span className="text-xs block mt-0.5" style={{ color: "#7e8b9c" }}>
                             {fmtDate(o.purchase_date)}
                           </span>
                         </td>
@@ -577,7 +577,7 @@ export default function PedidosPage() {
                               <Link href={`/pedidos/${o.id}`}>
                                 <motion.span whileHover={{ scale: 1.15 }}
                                   className="p-1.5 rounded-lg transition-colors cursor-pointer"
-                                  style={{ color: "#94a3b8" }}
+                                  style={{ color: "#7e8b9c" }}
                                   onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
                                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                                   <Pencil style={{ width: 14, height: 14 }} />
@@ -587,7 +587,7 @@ export default function PedidosPage() {
                             <Tooltip label="Excluir">
                               <motion.button whileHover={{ scale: 1.15 }}
                                 className="p-1.5 rounded-lg transition-colors"
-                                style={{ color: "#94a3b8" }}
+                                style={{ color: "#7e8b9c" }}
                                 onClick={() => setDeleteTarget(o)}
                                 onMouseEnter={e => {
                                   e.currentTarget.style.background = "#fee2e2"
@@ -595,7 +595,7 @@ export default function PedidosPage() {
                                 }}
                                 onMouseLeave={e => {
                                   e.currentTarget.style.background = "transparent"
-                                  e.currentTarget.style.color = "#94a3b8"
+                                  e.currentTarget.style.color = "#7e8b9c"
                                 }}>
                                 <Trash2 style={{ width: 14, height: 14 }} />
                               </motion.button>
@@ -613,7 +613,7 @@ export default function PedidosPage() {
           {/* Paginação */}
           <div className="flex items-center justify-between px-4 py-3 border-t"
             style={{ borderColor: "#f1f5f9" }}>
-            <div className="flex items-center gap-2 text-xs" style={{ color: "#64748b" }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: "#556376" }}>
               Mostrar
               <select value={perPage}
                 onChange={e => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
@@ -629,18 +629,18 @@ export default function PedidosPage() {
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={safePage === 1}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>‹</button>
+                style={{ color: "#556376" }}>‹</button>
 
               {pageButtons().map((p, i) =>
                 p === "…" ? (
                   <span key={`el-${i}`} className="w-8 h-8 flex items-center justify-center text-xs"
-                    style={{ color: "#94a3b8" }}>…</span>
+                    style={{ color: "#7e8b9c" }}>…</span>
                 ) : (
                   <button key={p} onClick={() => setCurrentPage(p as number)}
                     className="w-8 h-8 rounded-lg text-xs font-medium transition-colors"
                     style={{
                       background: p === safePage ? "#0f2744" : "transparent",
-                      color:      p === safePage ? "#fff"    : "#64748b",
+                      color:      p === safePage ? "#fff"    : "#556376",
                     }}>{p}</button>
                 )
               )}
@@ -648,7 +648,7 @@ export default function PedidosPage() {
               <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={safePage === totalPages}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>›</button>
+                style={{ color: "#556376" }}>›</button>
             </div>
           </div>
         </motion.div>
@@ -689,10 +689,10 @@ export default function PedidosPage() {
                 <Trash2 style={{ width: 22, height: 22, color: "#dc2626" }} />
               </div>
 
-              <h2 className="text-center font-bold text-lg mb-1" style={{ color: "#0f172a" }}>
+              <h2 className="text-center font-bold text-lg mb-1" style={{ color: "#121212" }}>
                 Excluir pedido?
               </h2>
-              <p className="text-center text-sm mb-4" style={{ color: "#64748b" }}>
+              <p className="text-center text-sm mb-4" style={{ color: "#556376" }}>
                 Esta ação não pode ser desfeita.
               </p>
 
@@ -700,14 +700,14 @@ export default function PedidosPage() {
               <div className="rounded-xl p-3 mb-5 text-sm"
                 style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
                 <div className="flex justify-between mb-1">
-                  <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Pedido</span>
+                  <span style={{ color: "#7e8b9c", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Pedido</span>
                   <span className="font-mono font-bold" style={{ color: "#1d4ed8" }}>
                     {fmtOs(deleteTarget.os_number, deleteTarget.os_sequence)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Cliente</span>
-                  <span className="font-medium" style={{ color: "#0f172a" }}>
+                  <span style={{ color: "#7e8b9c", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>Cliente</span>
+                  <span className="font-medium" style={{ color: "#121212" }}>
                     {deleteTarget.customer_name ?? "—"}
                   </span>
                 </div>
@@ -719,7 +719,7 @@ export default function PedidosPage() {
                   onClick={() => setDeleteTarget(null)}
                   disabled={deleting}
                   className="flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-50"
-                  style={{ borderColor: "#e2e8f0", color: "#475569" }}
+                  style={{ borderColor: "#e2e8f0", color: "#3c4859" }}
                   onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >

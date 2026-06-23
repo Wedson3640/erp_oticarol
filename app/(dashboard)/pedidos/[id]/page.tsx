@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { use, useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -105,36 +105,8 @@ const statusColor: Record<string, string> = {
 
   // ── Admin / encerramento ─────────────────────────────────────────────────
   "Revertido":                   "#dc2626",  // vermelho
-  "Fechado pelo Administrador":  "#6b7280",  // cinza
+  "Fechado pelo Administrador":  "#5b616d",  // cinza
 }
-
-// Situações disponíveis no "Mover Pedido" (fluxo real do sistema)
-const ORDER_SITUATIONS = [
-  "Compras",
-  "Compra Interna",
-  "Compra Externa",
-  "Aguardando Armação",
-  "Armação encaminhada",
-  "Enviado ao laboratório",
-  "Recebido no laboratório",
-  "Surfaçagem",
-  "Montagem Interna",
-  "Montagem Externa",
-  "Em montagem",
-  "Análise de recebimento",
-  "Controle de Qualidade",
-  "Encaminhando para logística",
-  "Trânsito",
-  "Retorno à logística",
-  "Recebido na Loja",
-  "Aguardando Retirada",
-  "Entregue ao Cliente",
-  "Revertido",
-  "Recompra",
-  "Perda Interna",
-  "Perda Externa",
-  "Fechado pelo Administrador",
-]
 
 /** Calcula duração legível entre duas datas ISO */
 function calcDuration(from: string, to: string | null): string {
@@ -169,7 +141,11 @@ export default function PedidoDetailPage({
   const [obsInput,     setObsInput]     = useState("")
   const [labInput,     setLabInput]     = useState("")
   const [labOsInput,   setLabOsInput]   = useState("")
+  const [lossInput,    setLossInput]    = useState("")
   const [saving,       setSaving]       = useState(false)
+
+  // Transições dinâmicas do banco
+  const [flowOptions, setFlowOptions] = useState<{ title: string; ui_hint: string | null }[]>([])
 
   // ── Carga de dados ──────────────────────────────────────────────────────────
 
@@ -200,7 +176,29 @@ export default function PedidoDetailPage({
       setError("Pedido não encontrado.")
     } else {
       setOrder(oRes.data as ServiceOrder)
-      setHistories((hRes.data ?? []) as ServiceOrderHistory[])
+      const hists = (hRes.data ?? []) as ServiceOrderHistory[]
+      setHistories(hists)
+
+      // Situação efetiva = última movimentação registrada no histórico
+      // (histórico vem DESC → index 0 é o mais recente)
+      // Fallback para service_orders.situation caso não haja histórico
+      const situacao = hists[0]?.situation ?? (oRes.data as ServiceOrder).situation
+      if (situacao) {
+        const sitRes = await sb.from("order_situations").select("id").eq("title", situacao).single()
+        if (sitRes.data) {
+          const flowRes = await sb
+            .from("order_situation_flows")
+            .select("ui_hint, next:next_id(title)")
+            .eq("actual_id", sitRes.data.id)
+            .eq("active", true)
+          setFlowOptions((flowRes.data ?? []).map(f => ({
+            title:   ((f.next as unknown) as { title: string }).title,
+            ui_hint: f.ui_hint as string | null,
+          })))
+        } else {
+          setFlowOptions([])
+        }
+      }
     }
     setLoading(false)
   }, [id])
@@ -216,14 +214,16 @@ export default function PedidoDetailPage({
     const { data: { user } } = await sb.auth.getUser()
     const operador = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "Sistema"
 
-    const needsLab = novaSituacao === "No Laboratório" || novaSituacao === "Surfaçagem"
+    const hint     = flowOptions.find(f => f.title === novaSituacao)?.ui_hint ?? null
+    const needsLab = hint === "lab"
+    const needsLoss = hint === "loss"
 
     await sb.from("service_order_histories").insert({
       service_order_id: order.id,
       situation:        novaSituacao,
       operator_name:    operador,
-      lab_os_number:    needsLab ? labOsInput || null : null,
-      notes:            obsInput || null,
+      lab_os_number:    needsLab  ? labOsInput || null : null,
+      notes:            needsLoss ? (lossInput || obsInput || null) : (obsInput || null),
     })
 
     const updateData: Record<string, unknown> = { situation: novaSituacao }
@@ -231,7 +231,7 @@ export default function PedidoDetailPage({
     await sb.from("service_orders").update(updateData).eq("id", order.id)
 
     setMovimentando(false)
-    setNovaSituacao(""); setObsInput(""); setLabInput(""); setLabOsInput("")
+    setNovaSituacao(""); setObsInput(""); setLabInput(""); setLabOsInput(""); setLossInput("")
     setSaving(false)
     loadData()
   }
@@ -260,13 +260,18 @@ export default function PedidoDetailPage({
   )
 
   const os        = fmtOs(order.os_number, order.os_sequence)
-  const sit       = order.situation ?? "Aguardando"
+  // Situação exibida = último histórico (verdade) ou campo do banco como fallback
+  const sit       = histories[0]?.situation ?? order.situation ?? "Aguardando"
   const prazo     = fmtDate(order.scheduled_delivery)
   const criadoEm  = fmtDateTime(order.created_at)
-  const showLab   = novaSituacao === "No Laboratório" || novaSituacao === "Surfaçagem"
+  // Transição selecionada → hint dinâmico do banco
+  const selectedHint         = flowOptions.find(f => f.title === novaSituacao)?.ui_hint ?? null
+  const showLab              = selectedHint === "lab"
+  const showLoss             = selectedHint === "loss"
+  const showTransfer         = selectedHint === "transfer"
 
-  // Situações disponíveis = todas menos a atual e as já passadas (simplificado)
-  const situacoesDisponiveis = ORDER_SITUATIONS.filter(s => s !== sit)
+  // Próximas situações válidas vêm do banco (order_situation_flows)
+  const situacoesDisponiveis = flowOptions
 
   // Timeline cronológica (histories chegam desc do Supabase)
   const historiesAsc = [...histories].reverse()
@@ -279,9 +284,9 @@ export default function PedidoDetailPage({
 
         <Link href="/pedidos"
           className="inline-flex items-center gap-2 text-sm transition-colors"
-          style={{ color: "#64748b" }}
+          style={{ color: "#556376" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#0f2744")}
-          onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+          onMouseLeave={e => (e.currentTarget.style.color = "#556376")}
         >
           <ArrowLeft className="w-4 h-4" /> Voltar para pedidos
         </Link>
@@ -309,21 +314,21 @@ export default function PedidoDetailPage({
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: 13, color: "#64748b" }}>
-                    Criado em {criadoEm} · Prazo: <strong style={{ color: "#0f172a" }}>{prazo}</strong>
+                  <p style={{ fontSize: 14, color: "#556376" }}>
+                    Criado em {criadoEm} · Prazo: <strong style={{ color: "#121212" }}>{prazo}</strong>
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link href={`/pedidos/${order.id}/editar`}>
                     <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
-                      style={{ borderColor: "#e2e8f0", color: "#475569", background: "#f8fafc" }}>
+                      style={{ borderColor: "#e2e8f0", color: "#3c4859", background: "#f8fafc" }}>
                       Editar
                     </button>
                   </Link>
                   <button
                     onClick={() => window.open(`/imprimir/pedidos/${order.id}`, "_blank")}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
-                    style={{ borderColor: "#e2e8f0", color: "#475569", background: "#f8fafc" }}>
+                    style={{ borderColor: "#e2e8f0", color: "#3c4859", background: "#f8fafc" }}>
                     <Printer className="w-4 h-4" /> Imprimir OS
                   </button>
                   <Link href="/garantias/nova">
@@ -349,20 +354,20 @@ export default function PedidoDetailPage({
                     : "—" },
                 ].map(item => (
                   <div key={item.label}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                       {item.label}
                     </p>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: "#0f172a" }}>{item.value}</p>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "#121212" }}>{item.value}</p>
                   </div>
                 ))}
               </div>
 
               {order.notes && (
                 <div className="mt-4 p-3 rounded-xl" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                     Observações
                   </p>
-                  <p style={{ fontSize: 13, color: "#475569" }}>{order.notes}</p>
+                  <p style={{ fontSize: 14, color: "#3c4859" }}>{order.notes}</p>
                 </div>
               )}
             </motion.div>
@@ -372,7 +377,7 @@ export default function PedidoDetailPage({
               style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)", overflow: "hidden" }}
             >
               <div className="px-6 py-4" style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Resumo</h3>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#121212" }}>Resumo</h3>
               </div>
               <div className="p-6">
                 <div className="grid gap-x-8 gap-y-4" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
@@ -385,10 +390,10 @@ export default function PedidoDetailPage({
                     { label: "Laboratório", value: order.laboratory ? `${order.laboratory.name}${order.lab_os_number ? ` · ${order.lab_os_number}` : ""}` : "—" },
                   ].map(item => (
                     <div key={item.label}>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                         {item.label}
                       </p>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: "#0f172a" }}>{item.value}</p>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: "#121212" }}>{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -419,18 +424,18 @@ export default function PedidoDetailPage({
                   >
                     <div className="p-6 space-y-4">
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Nova Situação
                         </label>
                         <select value={novaSituacao} onChange={e => setNovaSituacao(e.target.value)}
                           className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }}
                           onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                           onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                         >
                           <option value="">Selecione a situação...</option>
-                          {situacoesDisponiveis.map(s => (
-                            <option key={s} value={s}>{s}</option>
+                          {situacoesDisponiveis.map(({ title }) => (
+                            <option key={title} value={title}>{title}</option>
                           ))}
                         </select>
                       </div>
@@ -440,25 +445,25 @@ export default function PedidoDetailPage({
                           className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}
                         >
                           <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                               Nº OS Laboratório
                             </label>
                             <input value={labOsInput} onChange={e => setLabOsInput(e.target.value)}
                               type="text" placeholder="Ex: GV-12345"
                               className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                              style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                              style={{ borderColor: "#e2e8f0", color: "#121212" }}
                               onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                               onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                            <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                               Laboratório
                             </label>
                             <input value={labInput} onChange={e => setLabInput(e.target.value)}
                               type="text" placeholder="Ex: GrandVision"
                               className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                              style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                              style={{ borderColor: "#e2e8f0", color: "#121212" }}
                               onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                               onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                             />
@@ -466,14 +471,44 @@ export default function PedidoDetailPage({
                         </motion.div>
                       )}
 
+                      {showLoss && (
+                        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+                          <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
+                            Motivo da Perda <span style={{ color: "#dc2626" }}>*</span>
+                          </label>
+                          <input value={lossInput} onChange={e => setLossInput(e.target.value)}
+                            type="text" placeholder="Descreva o motivo da perda..."
+                            className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                            style={{ borderColor: "#e2e8f0", color: "#121212" }}
+                            onFocus={e => (e.target.style.borderColor = "#dc2626")}
+                            onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
+                          />
+                        </motion.div>
+                      )}
+
+                      {showTransfer && (
+                        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+                          <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
+                            Loja Destino
+                          </label>
+                          <input value={labInput} onChange={e => setLabInput(e.target.value)}
+                            type="text" placeholder="Código ou nome da loja destino"
+                            className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                            style={{ borderColor: "#e2e8f0", color: "#121212" }}
+                            onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
+                            onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
+                          />
+                        </motion.div>
+                      )}
+
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Observações
                         </label>
                         <textarea rows={2} value={obsInput} onChange={e => setObsInput(e.target.value)}
                           placeholder="Adicionar observação (opcional)..."
                           className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none resize-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }}
                           onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                           onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                         />
@@ -511,22 +546,22 @@ export default function PedidoDetailPage({
               style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)", overflow: "hidden" }}
             >
               <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <h4 style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Histórico</h4>
-                <span style={{ fontSize: 11, color: "#94a3b8" }}>{historiesAsc.length} etapa{historiesAsc.length !== 1 ? "s" : ""}</span>
+                <h4 style={{ fontSize: 14, fontWeight: 700, color: "#121212" }}>Histórico</h4>
+                <span style={{ fontSize: 11, color: "#7e8b9c" }}>{historiesAsc.length} etapa{historiesAsc.length !== 1 ? "s" : ""}</span>
               </div>
 
               {historiesAsc.length === 0 ? (
-                <p className="px-4 py-6 text-xs text-center" style={{ color: "#94a3b8" }}>
+                <p className="px-4 py-6 text-xs text-center" style={{ color: "#7e8b9c" }}>
                   Nenhuma movimentação registrada.
                 </p>
               ) : (
                 <div style={{ padding: "14px 14px 10px" }}>
                   {historiesAsc.map((h, i) => {
-                    const cor     = statusColor[h.situation] ?? "#94a3b8"
+                    const cor     = statusColor[h.situation] ?? "#7e8b9c"
                     const icone   = statusIcon[h.situation]  ?? <Clock className="w-3 h-3" />
                     const isLast  = i === historiesAsc.length - 1
                     const next    = historiesAsc[i + 1]
-                    const nextCor = next ? (statusColor[next.situation] ?? "#94a3b8") : cor
+                    const nextCor = next ? (statusColor[next.situation] ?? "#7e8b9c") : cor
                     const dur     = next
                       ? calcDuration(h.created_at, next.created_at)
                       : calcDuration(h.created_at, null)
@@ -541,7 +576,7 @@ export default function PedidoDetailPage({
                             width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
                             background: isLast ? `${cor}22` : "#f1f5f9",
                             border: `2px solid ${isLast ? cor : "#d1d5db"}`,
-                            color: isLast ? cor : "#9ca3af",
+                            color: isLast ? cor : "#858b95",
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}>
                             {icone}
@@ -551,27 +586,27 @@ export default function PedidoDetailPage({
                           <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
                             <div style={{
                               fontSize: 12, fontWeight: 700,
-                              color: isLast ? cor : "#374151",
+                              color: isLast ? cor : "#2f3745",
                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}>
                               {h.situation}
                             </div>
-                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>
+                            <div style={{ fontSize: 11, color: "#5b616d", marginTop: 1 }}>
                               {fmtDateTime(h.created_at)}
                             </div>
                             {h.operator_name && (
-                              <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>
+                              <div style={{ fontSize: 10, color: "#858b95", marginTop: 1 }}>
                                 {h.operator_name}
                               </div>
                             )}
                             {h.notes && (
-                              <div style={{ fontSize: 10, color: "#6b7280", fontStyle: "italic", marginTop: 1 }}>
+                              <div style={{ fontSize: 10, color: "#5b616d", fontStyle: "italic", marginTop: 1 }}>
                                 {h.notes}
                               </div>
                             )}
                             {/* "há X" na última entrada */}
                             {isLast && (
-                              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>
+                              <div style={{ fontSize: 10, color: "#7e8b9c", marginTop: 2 }}>
                                 há {dur}
                               </div>
                             )}
@@ -595,7 +630,7 @@ export default function PedidoDetailPage({
                             </div>
                             {/* Badge de duração */}
                             <div style={{
-                              fontSize: 10, color: "#94a3b8", letterSpacing: "0.02em",
+                              fontSize: 10, color: "#7e8b9c", letterSpacing: "0.02em",
                               background: "#f8fafc", border: "1px solid #e2e8f0",
                               borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap",
                             }}>
@@ -624,12 +659,12 @@ export default function PedidoDetailPage({
               style={{ background: "#fff", borderRadius: 16, padding: 20, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)" }}
             >
               <div className="flex items-center justify-between mb-3">
-                <h4 style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Garantias</h4>
+                <h4 style={{ fontSize: 14, fontWeight: 700, color: "#121212" }}>Garantias</h4>
                 <Link href="/garantias/nova" className="text-xs font-semibold" style={{ color: "#1d4ed8" }}>
                   + Nova
                 </Link>
               </div>
-              <p style={{ fontSize: 12, color: "#94a3b8" }}>
+              <p style={{ fontSize: 12, color: "#7e8b9c" }}>
                 Nenhuma garantia para este pedido.
               </p>
             </motion.div>

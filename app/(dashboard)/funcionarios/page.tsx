@@ -1,10 +1,10 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
-import { Plus, Search, Filter, Eye, Pencil, Trash2, X } from "lucide-react"
+import { Plus, Search, Filter, Eye, Pencil, Trash2, X, UserX, UserCheck, Loader2 } from "lucide-react"
 import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
 import { initials } from "@/lib/utils"
@@ -40,7 +40,114 @@ function fmtStatus(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 }
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// ─── Modal Desativar / Reativar ───────────────────────────────────────────────
+
+function ModalDesativar({
+  employee,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  employee:  EmployeeRow
+  onClose:   () => void
+  onConfirm: () => void
+  loading:   boolean
+}) {
+  const jaInativo = !employee.active || employee.status === "DESLIGADO"
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        style={{ backdropFilter: "blur(4px)", background: "rgba(0,0,0,0.45)" }}
+        onClick={onClose}
+      >
+        <motion.div
+          className="bg-white rounded-2xl shadow-2xl w-full overflow-hidden"
+          style={{ maxWidth: 420 }}
+          initial={{ scale: 0.94, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.94, y: 20 }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4"
+            style={{ borderBottom: "1px solid #f1f5f9" }}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center"
+                style={{ background: jaInativo ? "#D1FAE5" : "#FEE2E2" }}>
+                {jaInativo
+                  ? <UserCheck className="w-4 h-4" style={{ color: "#16a34a" }} />
+                  : <UserX className="w-4 h-4" style={{ color: "#dc2626" }} />
+                }
+              </div>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f2744" }}>
+                {jaInativo ? "Reativar funcionário" : "Desativar funcionário"}
+              </h3>
+            </div>
+            <button onClick={onClose} style={{ color: "#7e8b9c" }}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Corpo */}
+          <div className="px-6 py-5 space-y-4">
+            {/* Card do funcionário */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                style={{ background: AVATAR_COLORS[employee.id % AVATAR_COLORS.length] }}>
+                {employee.full_name.slice(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#0f2744" }}>{employee.full_name}</p>
+                <p style={{ fontSize: 12, color: "#7e8b9c" }}>
+                  {employee.job?.name ?? "Sem cargo"} · {employee.store?.code ?? "Sem loja"}
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 14, color: "#556376", lineHeight: 1.6 }}>
+              {jaInativo
+                ? "Ao reativar, o funcionário voltará a aparecer como ativo e poderá ser vinculado a pedidos e movimentações."
+                : "Ao desativar, o funcionário não poderá ser vinculado a novos pedidos ou movimentações. Este campo pode ser revertido a qualquer momento."
+              }
+            </p>
+          </div>
+
+          {/* Rodapé */}
+          <div className="flex items-center justify-end gap-2 px-6 py-4"
+            style={{ borderTop: "1px solid #f1f5f9" }}>
+            <button onClick={onClose} disabled={loading}
+              className="px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+              style={{ color: "#556376" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              Cancelar
+            </button>
+            <motion.button
+              onClick={onConfirm}
+              disabled={loading}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white"
+              style={{ background: jaInativo ? "#16a34a" : "#dc2626" }}
+            >
+              {loading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Aguarde…</>
+                : jaInativo
+                  ? <><UserCheck className="w-4 h-4" /> Sim, reativar</>
+                  : <><UserX className="w-4 h-4" /> Sim, desativar</>
+              }
+            </motion.button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function FuncionariosPage() {
   const [employees,    setEmployees]    = useState<EmployeeRow[]>([])
@@ -55,6 +162,27 @@ export default function FuncionariosPage() {
   // Paginação
   const [page,    setPage]    = useState(1)
   const [perPage, setPerPage] = useState(25)
+
+  // Modal desativar
+  const [desativarTarget,  setDesativarTarget]  = useState<EmployeeRow | null>(null)
+  const [desativarLoading, setDesativarLoading] = useState(false)
+  const [reload,           setReload]           = useState(0)
+
+  // ─── Desativar / Reativar ────────────────────────────────────────────────────
+
+  async function handleDesativar() {
+    if (!desativarTarget) return
+    setDesativarLoading(true)
+    const jaInativo = !desativarTarget.active || desativarTarget.status === "DESLIGADO"
+    const sb = createSupabaseBrowserClient()
+    await sb.from("employees").update({
+      active: jaInativo ? true : false,
+      status: jaInativo ? "ATIVO" : "DESLIGADO",
+    }).eq("id", desativarTarget.id)
+    setDesativarLoading(false)
+    setDesativarTarget(null)
+    setReload(r => r + 1)
+  }
 
   // ─── Carga ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +217,7 @@ export default function FuncionariosPage() {
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, activeFilter, page, perPage])
+  }, [search, statusFilter, activeFilter, page, perPage, reload])
 
   // ─── Paginação ───────────────────────────────────────────────────────────────
 
@@ -112,7 +240,7 @@ export default function FuncionariosPage() {
     transition-colors cursor-pointer
   `.trim()
   const selStyle = {
-    borderColor: "#e2e8f0", color: "#475569",
+    borderColor: "#e2e8f0", color: "#3c4859",
     background: "#f8fafc url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\") no-repeat right 8px center",
   }
 
@@ -151,7 +279,7 @@ export default function FuncionariosPage() {
           className="rounded-xl p-4 border flex items-center gap-3 flex-wrap"
           style={{ background: "#fff", borderColor: "#e2e8f0" }}
         >
-          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#94a3b8" }} />
+          <Filter className="w-4 h-4 flex-shrink-0" style={{ color: "#7e8b9c" }} />
 
           {/* Status */}
           <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
@@ -180,19 +308,19 @@ export default function FuncionariosPage() {
           {/* Busca */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
-              style={{ color: "#94a3b8" }} />
+              style={{ color: "#7e8b9c" }} />
             <input
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
               placeholder="Buscar por nome ou CPF..."
               className="w-full pl-9 pr-8 py-1.5 rounded-lg text-sm border outline-none transition-colors"
-              style={{ borderColor: "#e2e8f0", color: "#0f172a", background: "#f8fafc" }}
+              style={{ borderColor: "#e2e8f0", color: "#121212", background: "#f8fafc" }}
               onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
               onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
             />
             {search && (
               <button onClick={() => { setSearch(""); setPage(1) }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: "#94a3b8" }}>
+                className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: "#7e8b9c" }}>
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
@@ -200,9 +328,9 @@ export default function FuncionariosPage() {
 
           <button
             onClick={() => { setStatusFilter(""); setActiveFilter(""); setSearch(""); setPage(1) }}
-            className="text-sm transition-colors" style={{ color: "#94a3b8" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#475569")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#94a3b8")}
+            className="text-sm transition-colors" style={{ color: "#7e8b9c" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#3c4859")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#7e8b9c")}
           >
             Limpar
           </button>
@@ -219,7 +347,7 @@ export default function FuncionariosPage() {
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                 {["Funcionário", "Cargo", "Departamento", "Loja", "Status", "Admissão", "Ações"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: "#64748b" }}>
+                    style={{ color: "#556376" }}>
                     {h}
                   </th>
                 ))}
@@ -247,7 +375,7 @@ export default function FuncionariosPage() {
                 ))
               ) : employees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm" style={{ color: "#94a3b8" }}>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm" style={{ color: "#7e8b9c" }}>
                     Nenhum funcionário encontrado.
                   </td>
                 </tr>
@@ -277,23 +405,23 @@ export default function FuncionariosPage() {
                               {initials(f.short_name ?? f.full_name)}
                             </div>
                             <div>
-                              <span className="font-semibold block" style={{ color: "#0f172a" }}>
+                              <span className="font-semibold block" style={{ color: "#121212" }}>
                                 {f.full_name}
                               </span>
                               {f.cpf && (
-                                <span className="text-xs" style={{ color: "#94a3b8" }}>{f.cpf}</span>
+                                <span className="text-xs" style={{ color: "#7e8b9c" }}>{f.cpf}</span>
                               )}
                             </div>
                           </div>
                         </td>
 
                         {/* Cargo */}
-                        <td className="px-4 py-3 text-sm" style={{ color: "#475569" }}>
+                        <td className="px-4 py-3 text-sm" style={{ color: "#3c4859" }}>
                           {f.job?.name ?? "—"}
                         </td>
 
                         {/* Departamento */}
-                        <td className="px-4 py-3 text-sm" style={{ color: "#64748b" }}>
+                        <td className="px-4 py-3 text-sm" style={{ color: "#556376" }}>
                           {f.department?.name ?? "—"}
                         </td>
 
@@ -305,7 +433,7 @@ export default function FuncionariosPage() {
                               {f.store.code}
                             </span>
                           ) : (
-                            <span style={{ color: "#94a3b8", fontSize: 12 }}>—</span>
+                            <span style={{ color: "#7e8b9c", fontSize: 12 }}>—</span>
                           )}
                         </td>
 
@@ -315,7 +443,7 @@ export default function FuncionariosPage() {
                         </td>
 
                         {/* Admissão */}
-                        <td className="px-4 py-3 text-xs" style={{ color: "#64748b" }}>
+                        <td className="px-4 py-3 text-xs" style={{ color: "#556376" }}>
                           {fmtDate(f.hiring_date)}
                         </td>
 
@@ -325,7 +453,7 @@ export default function FuncionariosPage() {
                             <Tooltip label="Ver perfil">
                               <Link href={`/funcionarios/${f.id}`}>
                                 <motion.span whileHover={{ scale: 1.15 }}
-                                  className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
+                                  className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#7e8b9c" }}
                                   onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
                                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                                   <Eye style={{ width: 14, height: 14 }} />
@@ -333,18 +461,21 @@ export default function FuncionariosPage() {
                               </Link>
                             </Tooltip>
                             <Tooltip label="Editar">
-                              <motion.span whileHover={{ scale: 1.15 }}
-                                className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#94a3b8" }}
-                                onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
-                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                                <Pencil style={{ width: 14, height: 14 }} />
-                              </motion.span>
+                              <Link href={`/funcionarios/${f.id}/editar`}>
+                                <motion.span whileHover={{ scale: 1.15 }}
+                                  className="p-1.5 rounded-lg cursor-pointer" style={{ color: "#7e8b9c" }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = "#f1f5f9")}
+                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                  <Pencil style={{ width: 14, height: 14 }} />
+                                </motion.span>
+                              </Link>
                             </Tooltip>
-                            <Tooltip label="Desativar">
+                            <Tooltip label={!f.active || f.status === "DESLIGADO" ? "Reativar" : "Desativar"}>
                               <motion.button whileHover={{ scale: 1.15 }}
-                                className="p-1.5 rounded-lg" style={{ color: "#94a3b8" }}
+                                onClick={() => setDesativarTarget(f)}
+                                className="p-1.5 rounded-lg" style={{ color: "#7e8b9c" }}
                                 onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.color = "#dc2626" }}
-                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8" }}>
+                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#7e8b9c" }}>
                                 <Trash2 style={{ width: 14, height: 14 }} />
                               </motion.button>
                             </Tooltip>
@@ -361,7 +492,7 @@ export default function FuncionariosPage() {
           {/* Paginação */}
           <div className="flex items-center justify-between px-4 py-3 border-t"
             style={{ borderColor: "#f1f5f9" }}>
-            <div className="flex items-center gap-2 text-xs" style={{ color: "#64748b" }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: "#556376" }}>
               Mostrar
               <select value={perPage}
                 onChange={e => { setPerPage(Number(e.target.value)); setPage(1) }}
@@ -377,18 +508,18 @@ export default function FuncionariosPage() {
               <button onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={safePage === 1}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>‹</button>
+                style={{ color: "#556376" }}>‹</button>
 
               {pageButtons().map((p, i) =>
                 p === "…" ? (
                   <span key={`el-${i}`} className="w-8 h-8 flex items-center justify-center text-xs"
-                    style={{ color: "#94a3b8" }}>…</span>
+                    style={{ color: "#7e8b9c" }}>…</span>
                 ) : (
                   <button key={p} onClick={() => setPage(p as number)}
                     className="w-8 h-8 rounded-lg text-xs font-medium transition-colors"
                     style={{
                       background: p === safePage ? "#0f2744" : "transparent",
-                      color:      p === safePage ? "#fff"    : "#64748b",
+                      color:      p === safePage ? "#fff"    : "#556376",
                     }}>{p}</button>
                 )
               )}
@@ -396,11 +527,21 @@ export default function FuncionariosPage() {
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={safePage === totalPages}
                 className="w-8 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-30"
-                style={{ color: "#64748b" }}>›</button>
+                style={{ color: "#556376" }}>›</button>
             </div>
           </div>
         </motion.div>
       </main>
+
+      {/* Modal desativar/reativar */}
+      {desativarTarget && (
+        <ModalDesativar
+          employee={desativarTarget}
+          onClose={() => setDesativarTarget(null)}
+          onConfirm={handleDesativar}
+          loading={desativarLoading}
+        />
+      )}
     </>
   )
 }

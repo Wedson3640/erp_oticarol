@@ -11,7 +11,7 @@ export default function LoginPage() {
   const router       = useRouter()
   const params       = useSearchParams()
   const [showPwd,  setShowPwd]  = useState(false)
-  const [email,    setEmail]    = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
@@ -84,6 +84,7 @@ export default function LoginPage() {
                 setError(null)
                 try {
                   const sb = createSupabaseBrowserClient()
+                  const email = `${username.trim().toLowerCase()}@oticacarol.internal`
                   const { error: authError } = await sb.auth.signInWithPassword({ email, password })
                   if (authError) {
                     setError("E-mail ou senha inválidos.")
@@ -105,7 +106,7 @@ export default function LoginPage() {
                   className="block mb-2"
                   style={{ fontSize: 14, color: "#334155" }}
                 >
-                  E-mail cadastrado
+                  Usuário
                 </label>
                 <div className="relative">
                   <User
@@ -113,12 +114,12 @@ export default function LoginPage() {
                     style={{ width: 18, height: 18, color: "#94a3b8" }}
                   />
                   <input
-                    type="email"
-                    placeholder="seu@email.com"
-                    autoComplete="email"
+                    type="text"
+                    placeholder="nome.sobrenome"
+                    autoComplete="username"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))}
                     className="w-full outline-none transition-all"
                     style={{
                       paddingLeft: 48,

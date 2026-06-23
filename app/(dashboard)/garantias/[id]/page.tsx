@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { use, useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/Header"
 import { StatusBadge } from "@/components/ui/StatusBadge"
 import { SlaCard } from "@/components/ui/SlaCard"
 import {
-  ArrowLeft, ChevronDown, ExternalLink,
+  ArrowLeft, ChevronDown, ExternalLink, Pencil,
   Clock, CheckCircle2, AlertCircle, Wrench, Loader2,
   Package, FlaskConical, Search, Truck, Store, ThumbsUp,
 } from "lucide-react"
@@ -46,7 +46,7 @@ const timelineColor: Record<string, string> = {
   "Em Análise":                "#f59e0b",
   "Aprovada":                  "#22c55e",
   "Rejeitada":                 "#ef4444",
-  "Recebido na logística":     "#64748b",
+  "Recebido na logística":     "#556376",
   "Enviado ao laboratório":    "#8b5cf6",
   "Recebido no laboratório":   "#6366f1",
   "Controle de qualidade":     "#f59e0b",
@@ -80,6 +80,9 @@ export default function GarantiaDetailPage({
   const [obsInput,     setObsInput]     = useState("")
   const [saving,       setSaving]       = useState(false)
 
+  // Transições dinâmicas do banco
+  const [flowOptions, setFlowOptions] = useState<{ title: string; ui_hint: string | null }[]>([])
+
   // ── Carga de dados ──────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
@@ -93,7 +96,7 @@ export default function GarantiaDetailPage({
           *,
           store:stores(id,code,name),
           problem:warranty_problems(id,name),
-          service_order:service_orders(id,os_number,os_sequence,customer_name,customer_cpf)
+          service_order:service_orders(id,os_number,os_sequence,customer_name)
         `)
         .eq("id", id)
         .single(),
@@ -108,7 +111,27 @@ export default function GarantiaDetailPage({
       setError("Garantia não encontrada.")
     } else {
       setWarranty(wRes.data as Warranty)
-      setHistories((hRes.data ?? []) as WarrantyHistory[])
+      const hists = (hRes.data ?? []) as WarrantyHistory[]
+      setHistories(hists)
+
+      // Situação efetiva = último histórico (DESC → index 0 é o mais recente)
+      const situacao = hists[0]?.situation ?? (wRes.data as Warranty).situation
+      if (situacao) {
+        const sitRes = await sb.from("warranty_situations").select("id").eq("title", situacao).single()
+        if (sitRes.data) {
+          const flowRes = await sb
+            .from("warranty_situation_flows")
+            .select("ui_hint, next:next_id(title)")
+            .eq("actual_id", sitRes.data.id)
+            .eq("active", true)
+          setFlowOptions((flowRes.data ?? []).map(f => ({
+            title:   ((f.next as unknown) as { title: string }).title,
+            ui_hint: f.ui_hint as string | null,
+          })))
+        } else {
+          setFlowOptions([])
+        }
+      }
     }
     setLoading(false)
   }, [id])
@@ -167,7 +190,22 @@ export default function GarantiaDetailPage({
   const abertura = fmtDate(warranty.request_date ?? warranty.created_at)
   const fluxoIdx = FLUXO.findIndex(f => f.key === sit)
 
-  const situacoesDisponiveis = FLUXO.filter(f => f.key !== sit)
+  // Timeline cronológica (histories chegam desc do Supabase)
+  const historiesAsc = [...histories].reverse()
+
+  function calcDuration(from: string, to: string | null): string {
+    const diffMs = ((to ? new Date(to) : new Date())).getTime() - new Date(from).getTime()
+    if (diffMs <= 0) return "< 1min"
+    const mins  = Math.floor(diffMs / 60000)
+    const hours = Math.floor(mins / 60)
+    const days  = Math.floor(hours / 24)
+    if (days > 0)  return `${days}d ${hours % 24}h`
+    if (hours > 0) return `${hours}h ${mins % 60}min`
+    return `${mins}min`
+  }
+
+  // Próximas situações válidas vêm do banco (warranty_situation_flows)
+  const situacoesDisponiveis = flowOptions
 
   const clienteNome = warranty.customer_name
     ?? warranty.service_order?.customer_name
@@ -183,9 +221,9 @@ export default function GarantiaDetailPage({
 
         <Link href="/garantias"
           className="inline-flex items-center gap-2 text-sm transition-colors"
-          style={{ color: "#64748b" }}
+          style={{ color: "#556376" }}
           onMouseEnter={e => (e.currentTarget.style.color = "#0f2744")}
-          onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+          onMouseLeave={e => (e.currentTarget.style.color = "#556376")}
         >
           <ArrowLeft className="w-4 h-4" /> Voltar para garantias
         </Link>
@@ -211,7 +249,7 @@ export default function GarantiaDetailPage({
                     {FLUXO.map((step, si) => {
                       const ativo   = sit === step.key
                       const passado = si < fluxoIdx
-                      const cor     = ativo || passado ? step.color : "#94a3b8"
+                      const cor     = ativo || passado ? step.color : "#7e8b9c"
                       return (
                         <div key={step.key} className="flex items-center gap-2">
                           <div className="flex items-center gap-1.5">
@@ -235,7 +273,14 @@ export default function GarantiaDetailPage({
                     })}
                   </div>
                 </div>
-                <StatusBadge status={sit} size="md" />
+                <div className="flex items-center gap-2">
+                  <Link href={`/garantias/${warranty.id}/editar`}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+                    style={{ borderColor: "#bfdbfe", color: "#1d4ed8", background: "#eff6ff" }}>
+                    <Pencil className="w-4 h-4" /> Editar
+                  </Link>
+                  <StatusBadge status={sit} size="md" />
+                </div>
               </div>
 
               {/* Grid de info */}
@@ -250,81 +295,33 @@ export default function GarantiaDetailPage({
                   { label: "Problema", value: warranty.problem?.name ?? "—" },
                 ].map(item => (
                   <div key={item.label}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                       {item.label}
                     </p>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: "#0f172a" }}>{item.value}</p>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "#121212" }}>{item.value}</p>
                   </div>
                 ))}
+                {warranty.service_order && (
+                  <div>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                      Pedido Original
+                    </p>
+                    <Link href={`/pedidos/${warranty.service_order.id}`}
+                      className="inline-flex items-center gap-1.5 font-mono font-bold hover:underline"
+                      style={{ fontSize: 14, color: "#1d4ed8" }}>
+                      {fmtOs(warranty.service_order.os_number, warranty.service_order.os_sequence)}
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                )}
               </div>
 
               {warranty.notes && (
                 <div className="mt-4 p-3 rounded-xl" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: "#7e8b9c", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
                     Descrição do problema
                   </p>
-                  <p style={{ fontSize: 13, color: "#475569" }}>{warranty.notes}</p>
-                </div>
-              )}
-            </motion.div>
-
-            {/* ── Timeline ──────────────────────────────────────────────── */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)", overflow: "hidden" }}
-            >
-              <div className="px-6 py-4" style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
-                  Histórico de Movimentações
-                  <span className="ml-2 text-sm font-normal" style={{ color: "#94a3b8" }}>({histories.length})</span>
-                </h3>
-              </div>
-
-              {histories.length === 0 ? (
-                <p className="px-6 py-8 text-sm text-center" style={{ color: "#94a3b8" }}>
-                  Nenhuma movimentação registrada ainda.
-                </p>
-              ) : (
-                <div className="p-6 space-y-4">
-                  {histories.map((h, i) => {
-                    const cor   = timelineColor[h.situation] ?? "#94a3b8"
-                    const icone = timelineIcon[h.situation]  ?? <AlertCircle className="w-4 h-4" />
-                    const atual = i === 0
-                    return (
-                      <div key={h.id} className="flex gap-4">
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{
-                              background: atual ? `${cor}22` : "#f1f5f9",
-                              color: atual ? cor : "#94a3b8",
-                              border: `2px solid ${atual ? cor : "#e2e8f0"}`,
-                            }}>
-                            {icone}
-                          </div>
-                          {i < histories.length - 1 && (
-                            <div className="w-px flex-1 min-h-[20px]" style={{ background: "#e2e8f0" }} />
-                          )}
-                        </div>
-                        <div className="flex-1 pb-4 rounded-xl p-4"
-                          style={{
-                            background: atual ? "#f8faff" : "#fafafa",
-                            border: `1px solid ${atual ? "#dbeafe" : "#f1f5f9"}`,
-                          }}>
-                          <div className="flex items-center justify-between mb-2">
-                            <StatusBadge status={h.situation} size="sm" />
-                            <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmtDateTime(h.created_at)}</span>
-                          </div>
-                          {h.notes && (
-                            <p style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>{h.notes}</p>
-                          )}
-                          {h.operator_name && (
-                            <span style={{ fontSize: 12, color: "#64748b" }}>
-                              <strong>Operador:</strong> {h.operator_name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+                  <p style={{ fontSize: 14, color: "#3c4859" }}>{warranty.notes}</p>
                 </div>
               )}
             </motion.div>
@@ -353,29 +350,29 @@ export default function GarantiaDetailPage({
                   >
                     <div className="p-6 space-y-4">
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Nova Situação
                         </label>
                         <select value={novaSituacao} onChange={e => setNovaSituacao(e.target.value)}
                           className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }}
                           onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                           onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                         >
                           <option value="">Selecione...</option>
-                          {situacoesDisponiveis.map(s => (
-                            <option key={s.key} value={s.key}>{s.key}</option>
+                          {situacoesDisponiveis.map(({ title }) => (
+                            <option key={title} value={title}>{title}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#64748b" }}>
+                        <label className="block text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#556376" }}>
                           Observações
                         </label>
                         <textarea rows={2} value={obsInput} onChange={e => setObsInput(e.target.value)}
                           placeholder="Adicionar observação (opcional)..."
                           className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none resize-none"
-                          style={{ borderColor: "#e2e8f0", color: "#0f172a" }}
+                          style={{ borderColor: "#e2e8f0", color: "#121212" }}
                           onFocus={e => (e.target.style.borderColor = "#1d4ed8")}
                           onBlur={e  => (e.target.style.borderColor = "#e2e8f0")}
                         />
@@ -407,25 +404,106 @@ export default function GarantiaDetailPage({
           {/* ── SIDEBAR ──────────────────────────────────────────────── */}
           <div className="space-y-4">
 
-            {/* Pedido original */}
+            {/* ── Histórico — Timeline compacta vertical ───────────────── */}
             <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}
-              style={{ background: "#fff", borderRadius: 16, padding: 20, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)" }}
+              style={{ background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)", overflow: "hidden" }}
             >
-              <h4 style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>Pedido Original</h4>
-              {warranty.service_order ? (
-                <div className="p-3 rounded-xl" style={{ background: "#f8faff", border: "1px solid #dbeafe" }}>
-                  <p style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>Nº do Pedido</p>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-sm" style={{ color: "#1d4ed8" }}>
-                      {fmtOs(warranty.service_order.os_number, warranty.service_order.os_sequence)}
-                    </span>
-                    <Link href={`/pedidos/${warranty.service_order.id}`}>
-                      <ExternalLink className="w-4 h-4" style={{ color: "#1d4ed8" }} />
-                    </Link>
-                  </div>
-                </div>
+              <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <h4 style={{ fontSize: 14, fontWeight: 700, color: "#121212" }}>Histórico</h4>
+                <span style={{ fontSize: 11, color: "#7e8b9c" }}>
+                  {historiesAsc.length} etapa{historiesAsc.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              {historiesAsc.length === 0 ? (
+                <p className="px-4 py-6 text-xs text-center" style={{ color: "#7e8b9c" }}>
+                  Nenhuma movimentação registrada.
+                </p>
               ) : (
-                <p style={{ fontSize: 12, color: "#94a3b8" }}>Sem pedido vinculado.</p>
+                <div style={{ padding: "14px 14px 10px" }}>
+                  {historiesAsc.map((h, i) => {
+                    const cor     = timelineColor[h.situation] ?? "#7e8b9c"
+                    const icone   = timelineIcon[h.situation]  ?? <Clock className="w-3 h-3" />
+                    const isLast  = i === historiesAsc.length - 1
+                    const next    = historiesAsc[i + 1]
+                    const nextCor = next ? (timelineColor[next.situation] ?? "#7e8b9c") : cor
+                    const dur     = next
+                      ? calcDuration(h.created_at, next.created_at)
+                      : calcDuration(h.created_at, null)
+
+                    return (
+                      <div key={h.id}>
+                        {/* ── Entrada ── */}
+                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+
+                          {/* Círculo colorido */}
+                          <div style={{
+                            width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                            background: isLast ? `${cor}22` : "#f1f5f9",
+                            border: `2px solid ${isLast ? cor : "#d1d5db"}`,
+                            color: isLast ? cor : "#858b95",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            {icone}
+                          </div>
+
+                          {/* Texto da etapa */}
+                          <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+                            <div style={{
+                              fontSize: 12, fontWeight: 700,
+                              color: isLast ? cor : "#2f3745",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>
+                              {h.situation}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#5b616d", marginTop: 1 }}>
+                              {fmtDateTime(h.created_at)}
+                            </div>
+                            {h.operator_name && (
+                              <div style={{ fontSize: 10, color: "#858b95", marginTop: 1 }}>
+                                {h.operator_name}
+                              </div>
+                            )}
+                            {h.notes && (
+                              <div style={{ fontSize: 10, color: "#5b616d", fontStyle: "italic", marginTop: 1 }}>
+                                {h.notes}
+                              </div>
+                            )}
+                            {isLast && (
+                              <div style={{ fontSize: 10, color: "#7e8b9c", marginTop: 2 }}>
+                                há {dur}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* ── Conector com seta e duração ── */}
+                        {!isLast && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "4px 0 4px 12px" }}>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 2 }}>
+                              <div style={{ width: 2, height: 8, background: cor, opacity: 0.45 }} />
+                              <div style={{
+                                width: 0, height: 0,
+                                borderLeft: "4px solid transparent",
+                                borderRight: "4px solid transparent",
+                                borderTop: `6px solid ${nextCor}`,
+                                opacity: 0.75,
+                              }} />
+                              <div style={{ width: 2, height: 8, background: nextCor, opacity: 0.45 }} />
+                            </div>
+                            <div style={{
+                              fontSize: 10, color: "#7e8b9c", letterSpacing: "0.02em",
+                              background: "#f8fafc", border: "1px solid #e2e8f0",
+                              borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap",
+                            }}>
+                              {dur}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </motion.div>
 
