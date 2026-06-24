@@ -16,6 +16,9 @@ function LoginPageInner() {
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
 
+  const motivo = params.get("motivo")
+  const avisoInatividade = motivo === "inatividade"
+
   return (
     <div className="min-h-screen flex">
 
@@ -73,6 +76,12 @@ function LoginPageInner() {
               <p className="mt-2" style={{ fontSize: 15, color: "#64748b" }}>
                 Utilize suas credenciais para continuar
               </p>
+              {avisoInatividade && (
+                <p className="mt-3 px-4 py-2 rounded-xl text-sm font-medium"
+                  style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
+                  ⏱ Sessão encerrada por inatividade. Faça login novamente.
+                </p>
+              )}
             </div>
 
             {/* Formulário */}

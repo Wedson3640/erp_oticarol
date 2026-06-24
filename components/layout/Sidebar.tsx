@@ -61,7 +61,8 @@ export function Sidebar() {
   async function handleLogout() {
     const sb = createSupabaseBrowserClient()
     await sb.auth.signOut()
-    router.push("/login")
+    // Full reload para garantir limpeza do cookie de sessão no servidor
+    window.location.href = "/login"
   }
 
   return (
