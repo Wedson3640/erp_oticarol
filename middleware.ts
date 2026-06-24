@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 import type { CookieMethodsServer } from "@supabase/ssr"
 
 const PUBLIC_PATHS = ["/login", "/"]
@@ -52,13 +53,22 @@ export default async function middleware(request: NextRequest) {
   }
 
   // ── Primeiro acesso: redireciona para trocar senha ───────────────────────
-  // first_login é gravado em user_metadata (sem query extra ao banco).
-  if (
-    session &&
-    session.user.user_metadata?.first_login === true &&
-    !pathname.startsWith("/trocar-senha")
-  ) {
-    return NextResponse.redirect(new URL("/trocar-senha", request.url))
+  // Consulta sascarol.users diretamente — mais confiável que user_metadata do JWT.
+  if (session && !pathname.startsWith("/trocar-senha") && !pathname.startsWith("/api/")) {
+    const adminDb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { db: { schema: "sascarol" } }
+    )
+    const { data: userRow } = await adminDb
+      .from("users")
+      .select("first_login")
+      .eq("supabase_uid", session.user.id)
+      .single()
+
+    if (userRow?.first_login === true) {
+      return NextResponse.redirect(new URL("/trocar-senha", request.url))
+    }
   }
 
   return response

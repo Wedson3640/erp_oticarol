@@ -4,6 +4,11 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "ERP Ótica Carol",
   description: "Sistema de Gestão — Ótica Carol · Teresina, PI",
+  icons: {
+    icon: "/favicocarol.png",
+    shortcut: "/favicocarol.png",
+    apple: "/favicocarol.png",
+  },
 }
 
 export default function RootLayout({

@@ -621,7 +621,11 @@ function ModalEditar({ usuario, onClose, onSuccess }: {
 
 // ─── Modal Reset Senha ────────────────────────────────────────────────────────
 
-function ModalResetSenha({ usuario, onClose }: { usuario: UserRow; onClose: () => void }) {
+function ModalResetSenha({ usuario, onClose, onSuccess }: {
+  usuario:   UserRow
+  onClose:   () => void
+  onSuccess: () => void
+}) {
   const [loading,  setLoading]  = useState(false)
   const [success,  setSuccess]  = useState(false)
   const [error,    setError]    = useState("")
@@ -638,7 +642,7 @@ function ModalResetSenha({ usuario, onClose }: { usuario: UserRow; onClose: () =
     setLoading(false)
     if (!res.ok) { setError(json.error ?? "Erro ao redefinir senha"); return }
     setSuccess(true)
-    setTimeout(onClose, 1500)
+    setTimeout(() => { onSuccess(); onClose() }, 1500)
   }
 
   return (
@@ -1199,7 +1203,7 @@ export default function UsuariosPage() {
       {/* Modais */}
       {showCadastro   && <ModalCadastro   onClose={() => setShowCadastro(false)}  onSuccess={() => setReload(r => r + 1)} />}
       {editTarget     && <ModalEditar     usuario={editTarget}    onClose={() => setEditTarget(null)}    onSuccess={() => setReload(r => r + 1)} />}
-      {resetTarget    && <ModalResetSenha usuario={resetTarget}   onClose={() => setResetTarget(null)} />}
+      {resetTarget    && <ModalResetSenha usuario={resetTarget}   onClose={() => setResetTarget(null)} onSuccess={() => setReload(r => r + 1)} />}
       {desativarTarget && <ModalDesativar usuario={desativarTarget} onClose={() => setDesativarTarget(null)} onConfirm={handleDesativar} loading={desativarLoading} />}
       {excluirTarget   && <ModalExcluir  usuario={excluirTarget}   onClose={() => setExcluirTarget(null)}   onSuccess={() => setReload(r => r + 1)} />}
     </>

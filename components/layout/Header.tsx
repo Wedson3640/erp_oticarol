@@ -90,7 +90,7 @@ export function Header({ breadcrumbs, title }: HeaderProps) {
           onMouseLeave={(e) => (e.currentTarget.style.background = "#EAF2FF")}
         >
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
             style={{ background: "linear-gradient(135deg,#3B82F6,#0F5BFF)" }}
           >
             {initials(displayName)}

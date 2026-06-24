@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Eye, EyeOff, KeyRound, ShieldCheck, Loader2, AlertCircle } from "lucide-react"
 import { motion } from "framer-motion"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -22,15 +21,13 @@ function rules(v: string): Rule[] {
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function TrocarSenhaPage() {
-  const router = useRouter()
-
   const [novaSenha,    setNovaSenha]    = useState("")
   const [confirmar,    setConfirmar]    = useState("")
   const [showNova,     setShowNova]     = useState(false)
   const [showConfirm,  setShowConfirm]  = useState(false)
-  const [loading,      setLoading]      = useState(false)
-  const [error,        setError]        = useState<string | null>(null)
-  const [success,      setSuccess]      = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+  const [success,  setSuccess]  = useState(false)
 
   const validacoes  = rules(novaSenha)
   const tudo_ok     = validacoes.every(r => r.ok)
@@ -42,33 +39,46 @@ export default function TrocarSenhaPage() {
     setLoading(true)
     setError(null)
 
-    const sb = createSupabaseBrowserClient()
+    try {
+      const sb = createSupabaseBrowserClient()
 
-    // 1. Atualiza senha + limpa first_login no Supabase Auth
-    const { error: authErr } = await sb.auth.updateUser({
-      password: novaSenha,
-      data: { first_login: false },
-    })
-    if (authErr) {
-      setError(authErr.message)
+      // 1. Captura o uid ANTES de alterar a senha (updateUser pode rotacionar a sessão)
+      const { data: { user }, error: userErr } = await sb.auth.getUser()
+      if (userErr || !user) {
+        setError("Sessão expirada. Faça login novamente.")
+        setLoading(false)
+        return
+      }
+
+      // 2. Atualiza a senha no Supabase Auth
+      const { error: authErr } = await sb.auth.updateUser({ password: novaSenha })
+      if (authErr) {
+        setError(authErr.message)
+        setLoading(false)
+        return
+      }
+
+      // 3. Marca first_login = false em sascarol.users (service role via API)
+      const res = await fetch("/api/usuarios/primeiro-acesso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supabaseUid: user.id }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? `API erro ${res.status}`)
+      }
+
+      setSuccess(true)
       setLoading(false)
-      return
+
+      // Full reload após 2s — middleware relê first_login do banco atualizado
+      setTimeout(() => { window.location.href = "/dashboard" }, 2000)
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro inesperado ao salvar senha")
+      setLoading(false)
     }
-
-    // 2. Marca first_login = false na tabela sascarol.users
-    const { data: { user } } = await sb.auth.getUser()
-    if (user) {
-      await (sb as ReturnType<typeof createSupabaseBrowserClient>)
-        .from("users")
-        .update({ first_login: false })
-        .eq("supabase_uid", user.id)
-    }
-
-    setSuccess(true)
-    setLoading(false)
-
-    // Redireciona para o dashboard após 2 segundos
-    setTimeout(() => router.push("/dashboard"), 2000)
   }
 
   // ─── Tela de sucesso ─────────────────────────────────────────────────────────
