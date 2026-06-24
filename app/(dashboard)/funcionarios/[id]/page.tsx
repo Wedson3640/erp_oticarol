@@ -88,7 +88,7 @@ export default function FuncionarioPerfilPage({ params }: { params: Promise<{ id
         .single()
 
       if (error || !data) { setNotFound(true); setLoading(false); return }
-      setEmployee(data as EmployeeDetail)
+      setEmployee(data as unknown as EmployeeDetail)
       setLoading(false)
     }
     load()
