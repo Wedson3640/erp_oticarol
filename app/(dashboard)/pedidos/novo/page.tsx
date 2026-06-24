@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
@@ -43,7 +43,7 @@ const hoje = new Date().toISOString().split("T")[0]
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export default function NovoPedidoPage() {
+function NovoPedidoPageInner() {
 
   const router       = useRouter()
   const searchParams = useSearchParams()
@@ -684,5 +684,13 @@ export default function NovoPedidoPage() {
 
       </main>
     </>
+  )
+}
+
+export default function NovoPedidoPage() {
+  return (
+    <Suspense fallback={null}>
+      <NovoPedidoPageInner />
+    </Suspense>
   )
 }

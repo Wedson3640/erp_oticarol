@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Header } from "@/components/layout/Header"
@@ -22,7 +22,7 @@ async function buscaCep(cep: string) {
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-export default function NovoClientePage() {
+function NovoClientePageInner() {
 
   const router       = useRouter()
   const searchParams = useSearchParams()
@@ -454,5 +454,13 @@ export default function NovoClientePage() {
         </motion.div>
       </main>
     </>
+  )
+}
+
+export default function NovoClientePage() {
+  return (
+    <Suspense fallback={null}>
+      <NovoClientePageInner />
+    </Suspense>
   )
 }

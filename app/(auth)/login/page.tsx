@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Lock, User, LogIn, Loader2 } from "lucide-react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router       = useRouter()
   const params       = useSearchParams()
   const [showPwd,  setShowPwd]  = useState(false)
@@ -252,5 +252,13 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   )
 }
