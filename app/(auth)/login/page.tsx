@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import { Eye, EyeOff, Lock, User, LogIn, Loader2, MessageCircle, X } from "lucide-react"
+import { Eye, EyeOff, Lock, User, LogIn, Loader2, MessageCircle, X, ShieldCheck } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -280,45 +280,100 @@ function LoginPageInner() {
 
       <div className="min-h-screen flex">
 
-        {/* ── Esquerda: imagem de fundo + logo + textos ─────────────────────── */}
-        <div className="hidden lg:flex lg:w-[46%] xl:w-[48%] relative overflow-hidden flex-shrink-0 flex-col">
+        {/* ── Esquerda: painel Leão Vision ──────────────────────────────────── */}
+        <div
+          className="hidden lg:block lg:w-[46%] xl:w-[48%] relative overflow-hidden flex-shrink-0"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
           {/* Imagem de fundo */}
           <Image
             src="/fundo%20lado%20esquerdo.png"
             alt="Leão Vision ERP"
-            fill
-            className="object-cover object-center"
-            sizes="50vw"
-            priority
+            fill className="object-cover object-center" sizes="50vw" priority
           />
-          {/* Overlay escuro */}
-          <div className="absolute inset-0" style={{ background: "rgba(8,20,40,0.52)" }} />
-          {/* Degradê direito para suavizar a transição */}
-          <div className="absolute inset-y-0 right-0 w-20"
-            style={{ background: "linear-gradient(to right, transparent, rgba(245,246,250,0.4))" }} />
 
-          {/* Logo + texto — centralizados no overlay */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
-            {/* Ícone */}
-            <div style={{ width: 72, height: 72, borderRadius: 18, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.45)" }}>
-              <Image
-                src="/favico%20leaoescuro2.png"
-                alt="Leão Vision"
-                width={72}
-                height={72}
-                style={{ objectFit: "cover" }}
-              />
+          {/* Overlay azul escuro */}
+          <div className="absolute inset-0" style={{
+            background: "linear-gradient(160deg, #06152E 0%, #08265A 55%, #003B7A 100%)",
+            opacity: 0.91,
+          }} />
+
+          {/* ── Decorativo: círculos + linhas canto superior esquerdo ── */}
+          <div className="absolute top-8 left-8 pointer-events-none" style={{ opacity: 0.18 }}>
+            <svg width="160" height="160" viewBox="0 0 160 160" fill="none">
+              <circle cx="24" cy="24" r="20"  stroke="white" strokeWidth="1"/>
+              <circle cx="24" cy="24" r="40"  stroke="white" strokeWidth="0.8"/>
+              <circle cx="24" cy="24" r="62"  stroke="white" strokeWidth="0.6"/>
+              <circle cx="24" cy="24" r="86"  stroke="white" strokeWidth="0.4"/>
+              <line x1="0"   y1="24" x2="100" y2="24"  stroke="white" strokeWidth="0.7"/>
+              <line x1="24"  y1="0"  x2="24"  y2="100" stroke="white" strokeWidth="0.7"/>
+            </svg>
+          </div>
+
+          {/* ── Decorativo: pontilhado canto inferior esquerdo ── */}
+          <div className="absolute bottom-8 left-8 pointer-events-none" style={{ opacity: 0.22 }}>
+            <svg width="110" height="110" viewBox="0 0 110 110" fill="none">
+              {[0,1,2,3,4].map(row =>
+                [0,1,2,3,4].map(col => (
+                  <circle key={`${row}-${col}`} cx={col*22+6} cy={row*22+6} r={2} fill="white" />
+                ))
+              )}
+            </svg>
+          </div>
+
+          {/* Degradê direito */}
+          <div className="absolute inset-y-0 right-0 w-16" style={{
+            background: "linear-gradient(to right, transparent, rgba(245,246,250,0.35))",
+          }} />
+
+          {/* ── Conteúdo principal — centralizado verticalmente ── */}
+          <div className="absolute inset-0 flex flex-col justify-center px-12 py-16" style={{ gap: 0 }}>
+
+            {/* Logo */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ width: 80, height: 80, borderRadius: 22, overflow: "hidden", boxShadow: "0 6px 28px rgba(0,0,0,0.5)" }}>
+                <Image src="/favico%20leaoescuro2.png" alt="Leão Vision" width={80} height={80} style={{ objectFit: "cover" }} />
+              </div>
             </div>
 
-            {/* Textos */}
-            <div style={{ textAlign: "center", fontFamily: "sans-serif" }}>
-              <p style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
-                Leão Vision ERP
-              </p>
-              <p style={{ fontSize: 18, color: "rgba(255,255,255,0.8)", marginTop: 6, textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}>
-                Sistema interno de gestão operacional
-              </p>
+            {/* Título 48px */}
+            <h1 style={{ fontSize: 48, fontWeight: 800, lineHeight: 1.1, color: "#ffffff", marginBottom: 14 }}>
+              Leão <span style={{ color: "#2563EB" }}>Vision</span>{" "}
+              <span style={{ color: "#FDB913" }}>ERP</span>
+            </h1>
+
+            {/* Subtítulo 22px */}
+            <p style={{ fontSize: 22, fontWeight: 400, color: "rgba(255,255,255,0.72)", marginBottom: 14 }}>
+              Sistema interno de gestão operacional
+            </p>
+
+            {/* Linha amarela */}
+            <div style={{ width: 48, height: 3, borderRadius: 2, background: "#FDB913", marginBottom: 28 }} />
+
+            {/* Frase institucional 26px */}
+            <p style={{ fontSize: 26, fontWeight: 400, lineHeight: 1.35, color: "rgba(255,255,255,0.82)", marginBottom: 40, maxWidth: 380 }}>
+              Gestão integrada para marcas, lojas e operações.
+            </p>
+
+            {/* Bloco de segurança */}
+            <div style={{
+              display: "flex", alignItems: "flex-start", gap: 14,
+              padding: "16px 20px", borderRadius: 14, maxWidth: 380,
+              background: "rgba(255,255,255,0.07)",
+              border: "1px solid rgba(255,255,255,0.13)",
+              backdropFilter: "blur(8px)",
+            }}>
+              <ShieldCheck style={{ width: 24, height: 24, color: "#FDB913", flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <p style={{ fontSize: 17, fontWeight: 700, color: "#ffffff", marginBottom: 4 }}>
+                  Ambiente seguro
+                </p>
+                <p style={{ fontSize: 16, fontWeight: 400, color: "rgba(255,255,255,0.62)" }}>
+                  Acesso protegido e monitorado para colaboradores autorizados.
+                </p>
+              </div>
             </div>
+
           </div>
         </div>
 
