@@ -39,30 +39,31 @@ export default async function middleware(request: NextRequest) {
     { cookies: cookieMethods }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  // getUser() valida o token com o servidor Supabase (mais seguro que getSession)
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Raiz: logado → dashboard, deslogado → login (sem ?next)
   if (pathname === "/") {
     return NextResponse.redirect(
-      new URL(session ? "/dashboard" : "/login", request.url)
+      new URL(user ? "/dashboard" : "/login", request.url)
     )
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
-  if (!session && !isPublic) {
+  if (!user && !isPublic) {
     const loginUrl = new URL("/login", request.url)
     loginUrl.searchParams.set("next", pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  if (session && pathname.startsWith("/login")) {
+  if (user && pathname.startsWith("/login")) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
   // ── Primeiro acesso: redireciona para trocar senha ───────────────────────
   // Consulta sascarol.users diretamente — mais confiável que user_metadata do JWT.
-  if (session && !pathname.startsWith("/trocar-senha") && !pathname.startsWith("/api/")) {
+  if (user && !pathname.startsWith("/trocar-senha") && !pathname.startsWith("/api/")) {
     const adminDb = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -71,7 +72,7 @@ export default async function middleware(request: NextRequest) {
     const { data: userRow } = await adminDb
       .from("users")
       .select("first_login")
-      .eq("supabase_uid", session.user.id)
+      .eq("supabase_uid", user.id)
       .single()
 
     if (userRow?.first_login === true) {
