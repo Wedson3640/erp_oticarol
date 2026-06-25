@@ -292,12 +292,6 @@ function LoginPageInner() {
             fill className="object-cover object-center" sizes="50vw" priority
           />
 
-          {/* Overlay azul escuro */}
-          <div className="absolute inset-0" style={{
-            background: "linear-gradient(160deg, #06152E 0%, #08265A 55%, #003B7A 100%)",
-            opacity: 0.91,
-          }} />
-
           {/* ── Decorativo: círculos + linhas canto superior esquerdo ── */}
           <div className="absolute top-8 left-8 pointer-events-none" style={{ opacity: 0.18 }}>
             <svg width="160" height="160" viewBox="0 0 160 160" fill="none">
