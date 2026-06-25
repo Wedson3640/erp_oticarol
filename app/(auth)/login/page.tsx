@@ -384,13 +384,35 @@ function LoginPageInner() {
               className="bg-white rounded-2xl"
               style={{ padding: "48px 56px", boxShadow: "0 2px 8px rgba(15,39,68,0.06), 0 8px 40px rgba(15,39,68,0.09)" }}
             >
-              {/* Cabeçalho */}
-              <div className="text-center mb-10">
-                <h1 className="font-bold leading-tight" style={{ fontSize: 30, color: "#0f172a", letterSpacing: "-0.3px" }}>
-                  Acesse o sistema interno
-                </h1>
-                <p className="mt-2" style={{ fontSize: 15, color: "#64748b" }}>
-                  Utilize suas credenciais para continuar
+              {/* ── Cabeçalho: logo + título + acesso corporativo ── */}
+              <div style={{ marginBottom: 24, fontFamily: "'Inter', sans-serif" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 12, overflow: "hidden", flexShrink: 0, boxShadow: "0 2px 10px rgba(0,0,0,0.15)" }}>
+                    <Image src="/favico%20leaoescuro2.png" alt="Leão Vision" width={46} height={46} style={{ objectFit: "cover" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: "#0B1220" }}>
+                      Leão{" "}
+                      <span style={{ color: "#2563EB" }}>Vision</span>{" "}
+                      <span style={{ color: "#FDB913" }}>ERP</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#667085", marginTop: 2 }}>
+                      Acesso corporativo
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divisor */}
+              <div style={{ height: 1, background: "#EEF2F7", marginBottom: 24 }} />
+
+              {/* Bem-vindo */}
+              <div style={{ marginBottom: 28, fontFamily: "'Inter', sans-serif" }}>
+                <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0B1220", marginBottom: 6 }}>
+                  Bem-vindo de volta!
+                </h2>
+                <p style={{ fontSize: 15, color: "#667085" }}>
+                  Entre com suas credenciais para acessar o sistema.
                 </p>
                 {motivo === "inatividade" && (
                   <p className="mt-3 px-4 py-2 rounded-xl text-sm font-medium"
@@ -520,10 +542,18 @@ function LoginPageInner() {
               </form>
             </div>
 
-            {/* Versão */}
-            <p className="text-center mt-5" style={{ fontSize: 12, color: "#9daec4" }}>
-              Versão: 26.0601
-            </p>
+            {/* Ambiente seguro + versão */}
+            <div style={{ marginTop: 20, textAlign: "center", fontFamily: "'Inter', sans-serif" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                <ShieldCheck style={{ width: 15, height: 15, color: "#667085", flexShrink: 0 }} />
+                <p style={{ fontSize: 13, color: "#667085" }}>
+                  Ambiente seguro · Acesso restrito a colaboradores autorizados
+                </p>
+              </div>
+              <p style={{ fontSize: 12, color: "#9daec4", marginTop: 6 }}>
+                Versão: 26.0601
+              </p>
+            </div>
           </motion.div>
         </div>
       </div>
