@@ -338,7 +338,7 @@ function LoginPageInner() {
 
             {/* Subtítulo 22px */}
             <p style={{ fontSize: 22, fontWeight: 400, color: "rgba(255,255,255,0.72)", marginBottom: 14 }}>
-              Sistema interno de gestão operacional
+              Sistema de gestão do grupo leão
             </p>
 
             {/* Linha amarela */}
@@ -346,7 +346,7 @@ function LoginPageInner() {
 
             {/* Frase institucional 26px */}
             <p style={{ fontSize: 26, fontWeight: 400, lineHeight: 1.35, color: "rgba(255,255,255,0.82)", marginBottom: 40, maxWidth: 380 }}>
-              Plataforma integrada de gestão operacional.
+              Plataforma de controle operacional.
             </p>
 
             {/* Bloco de segurança */}
