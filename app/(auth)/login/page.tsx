@@ -280,19 +280,64 @@ function LoginPageInner() {
 
       <div className="min-h-screen flex">
 
-        {/* ── Esquerda: foto com máscara escura 45% ─────────────────────────── */}
-        <div className="hidden lg:block lg:w-[46%] xl:w-[48%] relative overflow-hidden flex-shrink-0">
+        {/* ── Esquerda: imagem de fundo + logo + textos ─────────────────────── */}
+        <div className="hidden lg:flex lg:w-[46%] xl:w-[48%] relative overflow-hidden flex-shrink-0 flex-col">
+          {/* Imagem de fundo */}
           <Image
-            src="/imagem_lado_esquerdo_loja_oculos%20(1).png"
-            alt="Interior da Ótica Carol"
+            src="/fundo%20lado%20esquerdo.png"
+            alt="Leão Vision ERP"
             fill
             className="object-cover object-center"
             sizes="50vw"
             priority
           />
-          <div className="absolute inset-0" style={{ background: "rgba(8,20,40,0.45)" }} />
+          {/* Overlay escuro */}
+          <div className="absolute inset-0" style={{ background: "rgba(8,20,40,0.52)" }} />
+          {/* Degradê direito para suavizar a transição */}
           <div className="absolute inset-y-0 right-0 w-20"
-            style={{ background: "linear-gradient(to right, transparent, rgba(245,246,250,0.5))" }} />
+            style={{ background: "linear-gradient(to right, transparent, rgba(245,246,250,0.4))" }} />
+
+          {/* Logo + texto — posicionados no canto inferior esquerdo */}
+          <div className="absolute bottom-12 left-10 flex flex-col gap-4">
+            {/* Ícone */}
+            <div
+              style={{
+                width: 72, height: 72, borderRadius: 18,
+                overflow: "hidden",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.45)",
+                flexShrink: 0,
+              }}
+            >
+              <Image
+                src="/favico%20leaoescuro2.png"
+                alt="Leão Vision"
+                width={72}
+                height={72}
+                style={{ objectFit: "cover" }}
+              />
+            </div>
+
+            {/* Textos */}
+            <div>
+              <h2 style={{
+                fontSize: 28, fontWeight: 800, color: "#ffffff",
+                letterSpacing: "-0.3px", lineHeight: 1.2,
+                textShadow: "0 2px 12px rgba(0,0,0,0.5)",
+              }}>
+                Leão Vision ERP
+              </h2>
+              <p style={{
+                fontSize: 15, color: "rgba(255,255,255,0.75)",
+                marginTop: 6, fontWeight: 400,
+                textShadow: "0 1px 6px rgba(0,0,0,0.4)",
+              }}>
+                Sistema interno de gestão operacional
+              </p>
+            </div>
+
+            {/* Linha decorativa */}
+            <div style={{ width: 48, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.35)" }} />
+          </div>
         </div>
 
         {/* ── Direita: formulário ────────────────────────────────────────────── */}

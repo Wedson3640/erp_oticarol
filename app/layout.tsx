@@ -5,9 +5,9 @@ export const metadata: Metadata = {
   title: "ERP Ótica Carol",
   description: "Sistema de Gestão — Ótica Carol · Teresina, PI",
   icons: {
-    icon: [{ url: "/favicocarol.png", type: "image/png" }],
-    shortcut: [{ url: "/favicocarol.png", type: "image/png" }],
-    apple: [{ url: "/favicocarol.png", type: "image/png" }],
+    icon: [{ url: "/favico leaoescuro2.png", type: "image/png" }],
+    shortcut: [{ url: "/favico leaoescuro2.png", type: "image/png" }],
+    apple: [{ url: "/favico leaoescuro2.png", type: "image/png" }],
   },
 }
 
