@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/Header"
 import {
   ArrowLeft, Flame, Search, UserPlus, User,
   Loader2, X, Check, AlertTriangle, ExternalLink,
+  Clock, ShoppingBag,
 } from "lucide-react"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -22,6 +23,18 @@ interface ClientResult {
   name:  string
   cpf:   string | null
   phone: string | null
+}
+
+interface ClientHistoryItem {
+  id:                 number
+  os_number:          string
+  os_sequence:        string | null
+  situation:          string
+  purchase_date:      string | null
+  scheduled_delivery: string | null
+  store_id:           number | null
+  employee_name:      string | null
+  urgent:             boolean
 }
 
 interface UserProfile {
@@ -40,6 +53,33 @@ const primeiroDiaMes = new Date(
 ).toISOString().split("T")[0]
 
 const hoje = new Date().toISOString().split("T")[0]
+
+// ─── Badge de situação ────────────────────────────────────────────────────────
+
+const SIT_COLORS: Record<string, { bg: string; text: string }> = {
+  "Compras":      { bg: "#eff6ff", text: "#1d4ed8" },
+  "Laboratório":  { bg: "#f3e8ff", text: "#7c3aed" },
+  "Conferência":  { bg: "#fefce8", text: "#a16207" },
+  "Pronto":       { bg: "#f0fdf4", text: "#16a34a" },
+  "Entregue":     { bg: "#f1f5f9", text: "#475569" },
+  "Cancelado":    { bg: "#fef2f2", text: "#dc2626" },
+  "Garantia":     { bg: "#fff7ed", text: "#c2410c" },
+  "Transporte":   { bg: "#ecfeff", text: "#0e7490" },
+  "Solicitação":  { bg: "#fdf4ff", text: "#86198f" },
+}
+
+function SitBadge({ situation, urgent }: { situation: string; urgent?: boolean }) {
+  const c = SIT_COLORS[situation] ?? { bg: "#f1f5f9", text: "#475569" }
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap"
+      style={{ background: c.bg, color: c.text }}
+    >
+      {urgent && <Flame className="w-3 h-3" />}
+      {situation}
+    </span>
+  )
+}
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -65,6 +105,10 @@ function NovoPedidoPageInner() {
   const [selectedClient, setSelectedClient] = useState<ClientResult | null>(null)
   const [searchedOnce,   setSearchedOnce]   = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
+
+  // ── Histórico do cliente selecionado
+  const [clientHistory,  setClientHistory]  = useState<ClientHistoryItem[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   // ── Dados do pedido
   const [urgente,        setUrgente]        = useState(false)
@@ -138,6 +182,27 @@ function NovoPedidoPageInner() {
     document.addEventListener("mousedown", handle)
     return () => document.removeEventListener("mousedown", handle)
   }, [])
+
+  // ─── Histórico do cliente ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!selectedClient) {
+      setClientHistory([])
+      return
+    }
+    setLoadingHistory(true)
+    const sb = createSupabaseBrowserClient()
+    sb.from("service_orders")
+      .select("id, os_number, os_sequence, situation, purchase_date, scheduled_delivery, store_id, employee_name, urgent")
+      .eq("customer_id", selectedClient.id)
+      .is("deleted_at", null)
+      .order("id", { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        setClientHistory((data as ClientHistoryItem[]) ?? [])
+        setLoadingHistory(false)
+      })
+  }, [selectedClient])
 
   // ─── Funcionários filtrados por loja ────────────────────────────────────────
 
@@ -651,6 +716,130 @@ function NovoPedidoPageInner() {
           )}
 
         </div>
+
+        {/* ══ HISTÓRICO DO CLIENTE ══════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {selectedClient && (
+            <motion.div
+              key="historico-cliente"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                background: "#fff", borderRadius: 16, padding: 28,
+                border: "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(15,39,68,0.05)",
+              }}
+            >
+              {/* Cabeçalho */}
+              <div className="flex items-center gap-3 mb-5">
+                <Clock className="w-5 h-5 flex-shrink-0" style={{ color: "#1d4ed8" }} />
+                <h2 className="font-bold" style={{ fontSize: 16, color: "#121212" }}>
+                  Histórico do Cliente
+                </h2>
+                {!loadingHistory && (
+                  <span
+                    className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                    style={{ background: "#eff6ff", color: "#1d4ed8" }}
+                  >
+                    {clientHistory.length} {clientHistory.length === 1 ? "pedido" : "pedidos"}
+                  </span>
+                )}
+              </div>
+
+              {/* Loading */}
+              {loadingHistory && (
+                <div className="flex items-center gap-2 py-4" style={{ color: "#7e8b9c" }}>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Carregando histórico...</span>
+                </div>
+              )}
+
+              {/* Sem pedidos */}
+              {!loadingHistory && clientHistory.length === 0 && (
+                <div className="py-6 flex flex-col items-center gap-2">
+                  <ShoppingBag className="w-9 h-9" style={{ color: "#cbd5e1" }} />
+                  <p className="text-sm" style={{ color: "#7e8b9c" }}>
+                    Nenhum pedido anterior encontrado para este cliente.
+                  </p>
+                </div>
+              )}
+
+              {/* Tabela */}
+              {!loadingHistory && clientHistory.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
+                        {["OS / Seq.", "Data compra", "Loja", "Vendedor", "Situação", ""].map(h => (
+                          <th key={h} className="pb-2.5 text-left text-xs font-semibold uppercase tracking-wide pr-4"
+                            style={{ color: "#556376" }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clientHistory.map((h, i) => (
+                        <tr
+                          key={h.id}
+                          className="transition-colors hover:bg-slate-50"
+                          style={{ borderBottom: i < clientHistory.length - 1 ? "1px solid #f1f5f9" : "none" }}
+                        >
+                          {/* OS */}
+                          <td className="py-2.5 pr-4">
+                            <span className="font-mono font-semibold text-sm" style={{ color: "#121212" }}>
+                              {h.os_number}
+                            </span>
+                            {h.os_sequence && (
+                              <span className="text-xs ml-1" style={{ color: "#7e8b9c" }}>
+                                · {h.os_sequence}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Data */}
+                          <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
+                            {h.purchase_date
+                              ? new Date(h.purchase_date + "T12:00:00").toLocaleDateString("pt-BR")
+                              : "—"}
+                          </td>
+
+                          {/* Loja */}
+                          <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
+                            {stores.find(s => s.id === h.store_id)?.name ?? "—"}
+                          </td>
+
+                          {/* Vendedor */}
+                          <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
+                            {h.employee_name ?? "—"}
+                          </td>
+
+                          {/* Situação */}
+                          <td className="py-2.5 pr-4">
+                            <SitBadge situation={h.situation} urgent={h.urgent} />
+                          </td>
+
+                          {/* Link */}
+                          <td className="py-2.5">
+                            <Link
+                              href={`/pedidos/${h.id}`}
+                              className="inline-flex items-center gap-1 text-xs font-medium transition-colors hover:underline"
+                              style={{ color: "#1d4ed8" }}
+                            >
+                              Ver
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Rodapé */}
         <motion.div
