@@ -297,17 +297,10 @@ function LoginPageInner() {
           <div className="absolute inset-y-0 right-0 w-20"
             style={{ background: "linear-gradient(to right, transparent, rgba(245,246,250,0.4))" }} />
 
-          {/* Logo + texto — posicionados no canto inferior esquerdo */}
-          <div className="absolute bottom-12 left-10 flex flex-col gap-4">
+          {/* Logo + texto — centralizados no overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
             {/* Ícone */}
-            <div
-              style={{
-                width: 72, height: 72, borderRadius: 18,
-                overflow: "hidden",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.45)",
-                flexShrink: 0,
-              }}
-            >
+            <div style={{ width: 72, height: 72, borderRadius: 18, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.45)" }}>
               <Image
                 src="/favico%20leaoescuro2.png"
                 alt="Leão Vision"
@@ -318,25 +311,14 @@ function LoginPageInner() {
             </div>
 
             {/* Textos */}
-            <div>
-              <h2 style={{
-                fontSize: 28, fontWeight: 800, color: "#ffffff",
-                letterSpacing: "-0.3px", lineHeight: 1.2,
-                textShadow: "0 2px 12px rgba(0,0,0,0.5)",
-              }}>
+            <div style={{ textAlign: "center", fontFamily: "sans-serif" }}>
+              <p style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
                 Leão Vision ERP
-              </h2>
-              <p style={{
-                fontSize: 15, color: "rgba(255,255,255,0.75)",
-                marginTop: 6, fontWeight: 400,
-                textShadow: "0 1px 6px rgba(0,0,0,0.4)",
-              }}>
+              </p>
+              <p style={{ fontSize: 18, color: "rgba(255,255,255,0.8)", marginTop: 6, textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}>
                 Sistema interno de gestão operacional
               </p>
             </div>
-
-            {/* Linha decorativa */}
-            <div style={{ width: 48, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.35)" }} />
           </div>
         </div>
 
