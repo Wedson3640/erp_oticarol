@@ -102,6 +102,7 @@ export interface ServiceOrderHistory {
   service_order_id: number
   situation:        string
   operator_name:    string | null
+  operator_uid:     string | null
   employee_id:      number | null
   laboratory_id:    number | null
   lab_os_number:    string | null
@@ -141,6 +142,7 @@ export interface WarrantyHistory {
   warranty_id:   number
   situation:     string
   operator_name: string | null
+  operator_uid:  string | null
   employee_id:   number | null
   notes:         string | null
   source:        'php' | 'manual' | null
@@ -178,6 +180,7 @@ export interface RequestHistory {
   request_id:    number
   situation:     string
   operator_name: string | null
+  operator_uid:  string | null
   employee_id:   number | null
   notes:         string | null
   created_at:    string

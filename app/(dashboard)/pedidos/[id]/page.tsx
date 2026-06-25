@@ -143,7 +143,8 @@ export default function PedidoDetailPage({
   const [labOsInput,   setLabOsInput]   = useState("")
   const [lossInput,    setLossInput]    = useState("")
   const [saving,       setSaving]       = useState(false)
-  const [operadorAtual, setOperadorAtual] = useState("")
+  const [operadorAtual, setOperadorAtual] = useState("")   // nome (display)
+  const [operadorUid,   setOperadorUid]   = useState("")   // uuid (comparação robusta)
   const [revertendo,    setRevertendo]    = useState(false)
 
   // Transições dinâmicas do banco
@@ -207,11 +208,12 @@ export default function PedidoDetailPage({
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Carrega nome do operador logado para validar reversão
+  // Carrega nome e uid do operador logado para validar reversão
   useEffect(() => {
     createSupabaseBrowserClient().auth.getUser().then(({ data: { user } }) => {
       const nome = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ""
       setOperadorAtual(nome)
+      setOperadorUid(user?.id ?? "")
     })
   }, [])
 
@@ -224,10 +226,19 @@ export default function PedidoDetailPage({
     // histories vem DESC → index 0 é a movimentação mais recente
     const ultima   = histories[0]
     const anterior = histories[1]
-    await sb.from("service_order_histories").delete().eq("id", ultima.id)
-    await sb.from("service_orders")
+    const { error: errDel } = await sb
+      .from("service_order_histories").delete().eq("id", ultima.id)
+    if (errDel) {
+      alert(`Erro ao reverter: ${errDel.message}`)
+      setRevertendo(false)
+      return
+    }
+    const { error: errUpd } = await sb.from("service_orders")
       .update({ situation: anterior?.situation ?? "Pedido criado" })
       .eq("id", order.id)
+    if (errUpd) {
+      alert(`Erro ao atualizar situação: ${errUpd.message}`)
+    }
     setRevertendo(false)
     loadData()
   }
@@ -249,6 +260,7 @@ export default function PedidoDetailPage({
       service_order_id: order.id,
       situation:        novaSituacao,
       operator_name:    operador,
+      operator_uid:     user?.id ?? null,
       lab_os_number:    needsLab  ? labOsInput || null : null,
       notes:            needsLoss ? (lossInput || obsInput || null) : (obsInput || null),
     })
@@ -638,7 +650,10 @@ export default function PedidoDetailPage({
                               </div>
                             )}
                             {/* Reverter — só para quem fez a movimentação */}
-                            {isLast && operadorAtual && h.operator_name === operadorAtual && (
+                            {isLast && operadorUid && (
+                              h.operator_uid === operadorUid ||
+                              (!h.operator_uid && h.operator_name === operadorAtual)
+                            ) && (
                               <motion.button
                                 whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                                 onClick={handleReverter}

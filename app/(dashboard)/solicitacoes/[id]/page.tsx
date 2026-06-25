@@ -101,7 +101,8 @@ export default function SolicitacaoDetailPage({
   const [novaSituacao, setNovaSituacao] = useState("")
   const [obsInput,     setObsInput]     = useState("")
   const [saving,       setSaving]       = useState(false)
-  const [operadorAtual, setOperadorAtual] = useState("")
+  const [operadorAtual, setOperadorAtual] = useState("")   // nome (display)
+  const [operadorUid,   setOperadorUid]   = useState("")   // uuid (comparação robusta)
   const [revertendo,    setRevertendo]    = useState(false)
 
   // Transições dinâmicas do banco
@@ -161,6 +162,7 @@ export default function SolicitacaoDetailPage({
     createSupabaseBrowserClient().auth.getUser().then(({ data: { user } }) => {
       const nome = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ""
       setOperadorAtual(nome)
+      setOperadorUid(user?.id ?? "")
     })
   }, [])
 
@@ -172,10 +174,19 @@ export default function SolicitacaoDetailPage({
     const sb = createSupabaseBrowserClient()
     const ultima   = histories[0]
     const anterior = histories[1]
-    await sb.from("request_histories").delete().eq("id", ultima.id)
-    await sb.from("requests")
+    const { error: errDel } = await sb
+      .from("request_histories").delete().eq("id", ultima.id)
+    if (errDel) {
+      alert(`Erro ao reverter: ${errDel.message}`)
+      setRevertendo(false)
+      return
+    }
+    const { error: errUpd } = await sb.from("requests")
       .update({ situation: anterior?.situation ?? "Solicitação Criada" })
       .eq("id", request.id)
+    if (errUpd) {
+      alert(`Erro ao atualizar situação: ${errUpd.message}`)
+    }
     setRevertendo(false)
     loadData()
   }
@@ -193,6 +204,7 @@ export default function SolicitacaoDetailPage({
       request_id:    request.id,
       situation:     novaSituacao,
       operator_name: operador,
+      operator_uid:  user?.id ?? null,
       notes:         obsInput || null,
     })
     await sb.from("requests").update({ situation: novaSituacao }).eq("id", request.id)
@@ -517,7 +529,10 @@ export default function SolicitacaoDetailPage({
                                 há {dur}
                               </div>
                             )}
-                            {isLast && operadorAtual && h.operator_name === operadorAtual && (
+                            {isLast && operadorUid && (
+                              h.operator_uid === operadorUid ||
+                              (!h.operator_uid && h.operator_name === operadorAtual)
+                            ) && (
                               <motion.button
                                 whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                                 onClick={handleReverter}
