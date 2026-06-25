@@ -3,9 +3,16 @@ import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import type { CookieMethodsServer } from "@supabase/ssr"
 
-const PUBLIC_PATHS = ["/login", "/"]
+const PUBLIC_PATHS = ["/login"]
 
 export default async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Raiz sempre vai ao dashboard (middleware decide: logado→dashboard, deslogado→login via /dashboard)
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
+
   let response = NextResponse.next({ request })
 
   // Explicitamente tipado como CookieMethodsServer para resolver o overload correto.
@@ -39,7 +46,6 @@ export default async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
-  const { pathname } = request.nextUrl
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
   if (!session && !isPublic) {

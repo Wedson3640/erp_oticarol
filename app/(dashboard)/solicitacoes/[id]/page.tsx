@@ -9,7 +9,7 @@ import {
   ArrowLeft, ChevronDown, Printer, Pencil,
   Clock, Package, CheckCircle2, Truck, XCircle,
   Building2, Wrench, Tag, Loader2,
-  FlaskConical, Store,
+  FlaskConical, Store, RotateCcw,
 } from "lucide-react"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -101,6 +101,8 @@ export default function SolicitacaoDetailPage({
   const [novaSituacao, setNovaSituacao] = useState("")
   const [obsInput,     setObsInput]     = useState("")
   const [saving,       setSaving]       = useState(false)
+  const [operadorAtual, setOperadorAtual] = useState("")
+  const [revertendo,    setRevertendo]    = useState(false)
 
   // Transições dinâmicas do banco
   const [flowOptions, setFlowOptions] = useState<{ title: string; ui_hint: string | null }[]>([])
@@ -154,6 +156,29 @@ export default function SolicitacaoDetailPage({
   }, [id])
 
   useEffect(() => { loadData() }, [loadData])
+
+  useEffect(() => {
+    createSupabaseBrowserClient().auth.getUser().then(({ data: { user } }) => {
+      const nome = (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? ""
+      setOperadorAtual(nome)
+    })
+  }, [])
+
+  // ── Reverter última movimentação ───────────────────────────────────────────
+
+  async function handleReverter() {
+    if (!request || histories.length === 0) return
+    setRevertendo(true)
+    const sb = createSupabaseBrowserClient()
+    const ultima   = histories[0]
+    const anterior = histories[1]
+    await sb.from("request_histories").delete().eq("id", ultima.id)
+    await sb.from("requests")
+      .update({ situation: anterior?.situation ?? "Solicitação Criada" })
+      .eq("id", request.id)
+    setRevertendo(false)
+    loadData()
+  }
 
   // ── Mover ───────────────────────────────────────────────────────────────────
 
@@ -491,6 +516,23 @@ export default function SolicitacaoDetailPage({
                               <div style={{ fontSize: 10, color: "#7e8b9c", marginTop: 2 }}>
                                 há {dur}
                               </div>
+                            )}
+                            {isLast && operadorAtual && h.operator_name === operadorAtual && (
+                              <motion.button
+                                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                                onClick={handleReverter}
+                                disabled={revertendo}
+                                className="flex items-center gap-1 mt-2 px-2 py-1 rounded-lg text-xs font-semibold"
+                                style={{
+                                  background: "#FEE2E2", color: "#B91C1C",
+                                  border: "1px solid #FECACA",
+                                  opacity: revertendo ? 0.6 : 1,
+                                  cursor: revertendo ? "not-allowed" : "pointer",
+                                }}
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                {revertendo ? "Revertendo…" : "Reverter movimentação"}
+                              </motion.button>
                             )}
                           </div>
                         </div>
