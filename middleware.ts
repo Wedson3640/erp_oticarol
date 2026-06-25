@@ -8,11 +8,6 @@ const PUBLIC_PATHS = ["/login"]
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Raiz sempre vai ao dashboard (middleware decide: logado→dashboard, deslogado→login via /dashboard)
-  if (pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
-  }
-
   let response = NextResponse.next({ request })
 
   // Explicitamente tipado como CookieMethodsServer para resolver o overload correto.
@@ -45,6 +40,13 @@ export default async function middleware(request: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
+
+  // Raiz: logado → dashboard, deslogado → login (sem ?next)
+  if (pathname === "/") {
+    return NextResponse.redirect(
+      new URL(session ? "/dashboard" : "/login", request.url)
+    )
+  }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
