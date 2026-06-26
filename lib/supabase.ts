@@ -9,8 +9,9 @@ export const supabase = createClient(url, anon, {
 })
 
 // Cliente admin (server actions / route handlers) — usa service role, bypass RLS
+// No browser a SUPABASE_SERVICE_ROLE_KEY não está disponível; cai no anon key como fallback seguro
 export const supabaseAdmin = createClient(
   url,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? anon,
   { db: { schema: 'sascarol' } }
 )
