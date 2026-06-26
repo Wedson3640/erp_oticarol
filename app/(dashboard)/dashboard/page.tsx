@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { Header } from "@/components/layout/Header"
-import { fmt } from "@/lib/utils"
 import {
   ShoppingBag, Target, MessageCircle,
   AlertTriangle, Clock, FlaskConical, Eye, Settings,
@@ -13,50 +12,55 @@ import {
 import { motion } from "framer-motion"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 
-// ─── Situações e cores ────────────────────────────────────────────────────────
+// ─── Situações ────────────────────────────────────────────────────────────────
 
-const ORDER_SITUATIONS = [
-  "Aguardando",
-  "No Laboratório",
-  "Surfaçagem",
-  "Em Andamento",
-  "Pronto p/ Entrega",
-  "Entregue",
-  "Cancelado",
-]
+// Situações que indicam pedido FINALIZADO (PHP legado + novo ERP)
+const SITUACOES_FINALIZADAS = ["Entregue ao Cliente", "Entregue", "Cancelado"]
 
+// Paleta de cores para as situações (PHP legado + novo ERP)
 const STATUS_COLORS: Record<string, string> = {
-  "Aguardando":        "#F59E0B",
-  "Em Andamento":      "#3B82F6",
-  "No Laboratório":    "#8B5CF6",
-  "Surfaçagem":        "#EC4899",
-  "Pronto p/ Entrega": "#22C55E",
-  "Entregue":          "#16A34A",
-  "Cancelado":         "#EF4444",
+  // Novo ERP
+  "Aguardando":                   "#F59E0B",
+  "No Laboratório":               "#8B5CF6",
+  "Surfaçagem":                   "#EC4899",
+  "Em Andamento":                 "#3B82F6",
+  "Pronto p/ Entrega":            "#22C55E",
+  "Entregue":                     "#16A34A",
+  "Cancelado":                    "#EF4444",
+  // PHP legado
+  "Pedido criado":                "#94A3B8",
+  "Recebido na Loja":             "#0EA5E9",
+  "Trânsito":                     "#6366F1",
+  "Montagem Interna":             "#F97316",
+  "Aguardando Retirada":          "#22C55E",
+  "Aguardando Armação":           "#F59E0B",
+  "Compras":                      "#A855F7",
+  "Enviado ao laboratório":       "#8B5CF6",
+  "Recebido no laboratório":      "#7C3AED",
+  "Compra Externa":               "#D946EF",
+  "Armação encaminhada":          "#F97316",
+  "Transferência entre lojas":    "#06B6D4",
+  "Retorno à logística":          "#EF4444",
+  "Revertido":                    "#6B7280",
+  "Entregue ao Cliente":          "#16A34A",
 }
-
-// Situações exibidas no gráfico (Entregue domina — excluído do pie)
-const PIE_SITUATIONS = [
-  "Aguardando", "Em Andamento", "No Laboratório",
-  "Surfaçagem", "Pronto p/ Entrega", "Cancelado",
-]
-
-// ─── Mock: vendedores (metas ainda não têm dados no banco) ────────────────────
-
-const sellers = [
-  { name: "Ana Souza",    metaRX: 2000, realRX: 1200, pctRX: 60,  metaSol: 3000, realSol: 2500, pctSol: 83 },
-  { name: "Carlos Lima",  metaRX: 2000, realRX: 850,  pctRX: 42,  metaSol: 3000, realSol: 1200, pctSol: 40 },
-  { name: "Juliana Dias", metaRX: 2000, realRX: 1700, pctRX: 85,  metaSol: 3000, realSol: 2900, pctSol: 97 },
-  { name: "Marcos Silva", metaRX: 2000, realRX: 650,  pctRX: 32,  metaSol: 3000, realSol: 900,  pctSol: 30 },
-]
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface DashMetrics {
-  byStatus:           Record<string, number>
-  atrasados:          number
+  pendentes:          number   // ativos (não finalizados, não null)
+  atrasados:          number   // ativos com prazo vencido
   urgentes:           number
   garantiasPendentes: number
+  pieData:            { name: string; value: number; fill: string }[]
+}
+
+interface EmpRow {
+  name:       string
+  total:      number
+  pendentes:  number
+  entregues:  number
+  pct:        number
 }
 
 interface KpiCard {
@@ -105,10 +109,19 @@ function Skeleton({ w = "60%" }: { w?: string }) {
 
 // ─── Componente ──────────────────────────────────────────────────────────────
 
+function saudacao() {
+  const h = new Date().getHours()
+  if (h < 12) return "Bom dia"
+  if (h < 18) return "Boa tarde"
+  return "Boa noite"
+}
+
 export default function DashboardPage() {
   const [hoveredCard,    setHoveredCard]    = useState<number | null>(null)
   const [metrics,        setMetrics]        = useState<DashMetrics | null>(null)
   const [loadingMetrics, setLoadingMetrics] = useState(true)
+  const [employees,      setEmployees]      = useState<EmpRow[]>([])
+  const [loadingEmp,     setLoadingEmp]     = useState(true)
 
   // ── Carrega métricas reais do Supabase ────────────────────────────────────
 
@@ -117,61 +130,101 @@ export default function DashboardPage() {
       const sb    = createSupabaseBrowserClient()
       const today = new Date().toISOString().slice(0, 10)
 
+      // Uma query busca todas as situações não-nulas → agrupa no cliente
+      // Evita N queries HEAD e captura tanto situações PHP quanto novo ERP
       const [sitRes, atrasadosRes, urgentesRes, garantiasRes] = await Promise.all([
-        // Contagem por situação (7 queries de HEAD — sem retornar linhas)
-        Promise.all(
-          ORDER_SITUATIONS.map(sit =>
-            sb.from("service_orders")
-              .select("*", { count: "exact", head: true })
-              .eq("situation", sit)
-          ),
-        ),
-        // Atrasados: prazo < hoje e ainda pendentes
+        sb.from("service_orders")
+          .select("situation")
+          .not("situation", "is", null),
+        // Atrasados: situação ativa (não finalizado) + prazo vencido
         sb.from("service_orders")
           .select("*", { count: "exact", head: true })
-          .lt("scheduled_delivery", today)
-          .neq("situation", "Entregue")
-          .neq("situation", "Cancelado"),
-        // Urgentes: flag urgent = true e ainda pendentes
+          .not("situation", "is", null)
+          .not("situation", "in", `(${SITUACOES_FINALIZADAS.join(",")})`)
+          .lt("scheduled_delivery", today),
+        // Urgentes: flag urgent + situação ativa
         sb.from("service_orders")
           .select("*", { count: "exact", head: true })
           .eq("urgent", true)
-          .neq("situation", "Entregue")
-          .neq("situation", "Cancelado"),
+          .not("situation", "is", null)
+          .not("situation", "in", `(${SITUACOES_FINALIZADAS.join(",")})`),
         // Garantias em aberto
         sb.from("warranties")
           .select("*", { count: "exact", head: true })
           .neq("situation", "Encerrado"),
       ])
 
+      // Agrupa situações dinamicamente
       const byStatus: Record<string, number> = {}
-      ORDER_SITUATIONS.forEach((sit, i) => {
-        byStatus[sit] = sitRes[i].count ?? 0
-      })
+      let totalPendentes = 0
+      for (const row of (sitRes.data ?? [])) {
+        const sit = row.situation as string
+        byStatus[sit] = (byStatus[sit] ?? 0) + 1
+        if (!SITUACOES_FINALIZADAS.includes(sit)) totalPendentes++
+      }
+
+      // Top 7 situações para o gráfico (excluindo finalizadas)
+      const pieData = Object.entries(byStatus)
+        .filter(([sit]) => !SITUACOES_FINALIZADAS.includes(sit))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 7)
+        .map(([name, value]) => ({
+          name,
+          value,
+          fill: STATUS_COLORS[name] ?? "#94A3B8",
+        }))
 
       setMetrics({
-        byStatus,
+        pendentes:          totalPendentes,
         atrasados:          atrasadosRes.count ?? 0,
         urgentes:           urgentesRes.count  ?? 0,
         garantiasPendentes: garantiasRes.count ?? 0,
+        pieData,
       })
       setLoadingMetrics(false)
     }
+
+    async function loadEmployees() {
+      const sb  = createSupabaseBrowserClient()
+      const now = new Date()
+      // Usa purchase_date (data real do pedido) para filtrar o mês corrente
+      const mesInicio = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+
+      const { data } = await sb
+        .from("service_orders")
+        .select("employee_name,situation")
+        .gte("purchase_date", mesInicio)
+        .not("employee_name", "is", null)
+        .neq("employee_name", "")
+
+      if (!data) { setLoadingEmp(false); return }
+
+      const map: Record<string, EmpRow> = {}
+      for (const row of data) {
+        const name = (row.employee_name as string).trim()
+        if (!name) continue
+        if (!map[name]) map[name] = { name, total: 0, pendentes: 0, entregues: 0, pct: 0 }
+        map[name].total++
+        if (SITUACOES_FINALIZADAS.includes(row.situation as string)) map[name].entregues++
+        else if (row.situation) map[name].pendentes++
+      }
+
+      const rows = Object.values(map)
+        .map(r => ({ ...r, pct: r.total > 0 ? Math.round((r.entregues / r.total) * 100) : 0 }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10)
+
+      setEmployees(rows)
+      setLoadingEmp(false)
+    }
+
     load()
+    loadEmployees()
   }, [])
 
   // ── Derivados ─────────────────────────────────────────────────────────────
 
-  const pendentes = metrics
-    ? ["Aguardando", "No Laboratório", "Surfaçagem", "Em Andamento", "Pronto p/ Entrega"]
-        .reduce((s, k) => s + (metrics.byStatus[k] ?? 0), 0)
-    : null
-
-  // 'fill' é lido diretamente pelo recharts v3 para colorir segmentos sem Cell
-  const pieData = PIE_SITUATIONS
-    .map(sit => ({ name: sit, value: metrics?.byStatus[sit] ?? 0, color: STATUS_COLORS[sit], fill: STATUS_COLORS[sit] }))
-    .filter(d => d.value > 0)
-
+  const pieData  = metrics?.pieData ?? []
   const totalPie = pieData.reduce((s, d) => s + d.value, 0)
 
   const bottomCards = [
@@ -187,12 +240,12 @@ export default function DashboardPage() {
     },
     {
       label: "No Laboratório",
-      value: metrics?.byStatus["No Laboratório"],
+      value: pieData.find(d => d.name === "No Laboratório" || d.name === "Enviado ao laboratório")?.value,
       icon: FlaskConical, iconBg: "#F3E8FF", iconColor: "#8B5CF6",
     },
     {
       label: "Prontos p/ Entrega",
-      value: metrics?.byStatus["Pronto p/ Entrega"],
+      value: pieData.find(d => d.name === "Pronto p/ Entrega" || d.name === "Aguardando Retirada")?.value,
       icon: Eye, iconBg: "#DCFCE7", iconColor: "#16A34A",
     },
     {
@@ -202,7 +255,7 @@ export default function DashboardPage() {
     },
     {
       label: "Conversas S/ Resposta",
-      value: 12,   // TODO: conectar ao módulo de conversas
+      value: null,
       icon: MessageCircle, iconBg: "#EAF2FF", iconColor: "#3B82F6",
     },
   ]
@@ -223,7 +276,7 @@ export default function DashboardPage() {
         >
           <div>
             <h2 style={{ fontSize: 32, fontWeight: 700, color: "#061A35", lineHeight: 1.1 }}>
-              Bom dia! 👋
+              {saudacao()}! 👋
             </h2>
             <p className="mt-1" style={{ fontSize: 15, color: "#40516F" }}>
               Hoje é {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
@@ -236,7 +289,7 @@ export default function DashboardPage() {
           const kpiCards: KpiCard[] = [
             {
               label: "Pedidos Pendentes",
-              value: loadingMetrics ? null : String(pendentes ?? 0),
+              value: loadingMetrics ? null : String(metrics?.pendentes ?? 0),
               icon: ShoppingBag, iconBg: "#EAF2FF", iconColor: "#0F5BFF",
               sub: "em aberto agora", subColor: "#40516F",
             },
@@ -316,10 +369,52 @@ export default function DashboardPage() {
           )
         })()}
 
-        {/* Tabela de metas + Gráfico */}
+        {/* Quick stats — dados reais */}
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(6,1fr)" }}>
+          {bottomCards.map((card, i) => (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 + i * 0.05 }}
+              style={{
+                background: "#fff", border: "1px solid #DDE7F3",
+                borderRadius: 14, padding: "18px 20px",
+                boxShadow: "0 4px 16px rgba(15,39,68,0.05)",
+              }}
+              onMouseEnter={(e) => {
+                ;(e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"
+                ;(e.currentTarget as HTMLElement).style.boxShadow = "0 12px 30px rgba(15,39,68,0.10)"
+              }}
+              onMouseLeave={(e) => {
+                ;(e.currentTarget as HTMLElement).style.transform = "translateY(0)"
+                ;(e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(15,39,68,0.05)"
+              }}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <p style={{ fontSize: 12, fontWeight: 500, color: "#60708A", lineHeight: 1.3 }}>
+                  {card.label}
+                </p>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                     style={{ background: card.iconBg }}>
+                  <card.icon style={{ width: 16, height: 16, color: card.iconColor, strokeWidth: 2 }} />
+                </div>
+              </div>
+              {loadingMetrics && card.label !== "Conversas S/ Resposta" ? (
+                <Skeleton w="40%" />
+              ) : (
+                <p style={{ fontSize: 28, fontWeight: 700, color: "#061A35", lineHeight: 1 }}>
+                  {card.value ?? 0}
+                </p>
+              )}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Tabela funcionários + Gráfico */}
         <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 320px" }}>
 
-          {/* Tabela de metas — mock enquanto não há dados reais */}
+          {/* Pedidos por funcionário no mês — dados reais */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -332,18 +427,18 @@ export default function DashboardPage() {
             <div className="px-6 py-5 flex items-center justify-between"
                  style={{ borderBottom: "1px solid #EAF2FF" }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "#061A35" }}>
-                Acompanhamento de Metas
+                Pedidos por Funcionário — mês atual
               </h2>
               <span className="text-xs px-2 py-1 rounded-lg font-medium"
-                    style={{ background: "#FEF3C7", color: "#92400E" }}>
-                dados simulados
+                    style={{ background: "#DCFCE7", color: "#166534" }}>
+                dados reais
               </span>
             </div>
             <div className="overflow-x-auto">
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#F6FAFF" }}>
-                    {["VENDEDOR", "META RX", "REALIZ. RX", "% RX", "META SOL", "REALIZ. SOL", "% SOL"].map((h) => (
+                    {["FUNCIONÁRIO", "TOTAL", "PENDENTES", "ENTREGUES", "% ENTREGUE"].map((h) => (
                       <th key={h} style={{
                         padding: "10px 20px", textAlign: "left",
                         fontSize: 11, fontWeight: 600, color: "#60708A",
@@ -354,21 +449,36 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sellers.map((s, i) => (
-                    <tr key={s.name}
-                        style={{ height: 52, borderBottom: i < sellers.length - 1 ? "1px solid #F0F5FF" : "none" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFCFF")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      <td style={{ padding: "0 20px", fontSize: 14, fontWeight: 600, color: "#061A35" }}>{s.name}</td>
-                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.metaRX)}</td>
-                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.realRX)}</td>
-                      <td style={{ padding: "0 20px", minWidth: 120 }}><PctBar pct={s.pctRX} /></td>
-                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.metaSol)}</td>
-                      <td style={{ padding: "0 20px", fontSize: 14, color: "#40516F" }}>{fmt(s.realSol)}</td>
-                      <td style={{ padding: "0 20px", minWidth: 120 }}><PctBar pct={s.pctSol} /></td>
-                    </tr>
-                  ))}
+                  {loadingEmp
+                    ? Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i} style={{ height: 52, borderBottom: "1px solid #F0F5FF" }}>
+                          {Array.from({ length: 5 }).map((__, j) => (
+                            <td key={j} style={{ padding: "0 20px" }}>
+                              <div className="h-4 rounded animate-pulse" style={{ background: "#E8EEF7", width: j === 0 ? 140 : 48 }} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    : employees.length === 0
+                      ? (
+                          <tr><td colSpan={5} style={{ padding: "24px 20px", color: "#60708A", fontSize: 14, textAlign: "center" }}>
+                            Nenhum pedido registrado este mês.
+                          </td></tr>
+                        )
+                      : employees.map((e, i) => (
+                          <tr key={e.name}
+                              style={{ height: 52, borderBottom: i < employees.length - 1 ? "1px solid #F0F5FF" : "none" }}
+                              onMouseEnter={(ev) => (ev.currentTarget.style.background = "#FAFCFF")}
+                              onMouseLeave={(ev) => (ev.currentTarget.style.background = "transparent")}
+                          >
+                            <td style={{ padding: "0 20px", fontSize: 14, fontWeight: 600, color: "#061A35" }}>{e.name}</td>
+                            <td style={{ padding: "0 20px", fontSize: 14, fontWeight: 700, color: "#0F5BFF" }}>{e.total}</td>
+                            <td style={{ padding: "0 20px", fontSize: 14, color: "#F59E0B", fontWeight: 600 }}>{e.pendentes}</td>
+                            <td style={{ padding: "0 20px", fontSize: 14, color: "#16A34A", fontWeight: 600 }}>{e.entregues}</td>
+                            <td style={{ padding: "0 20px", minWidth: 140 }}><PctBar pct={e.pct} /></td>
+                          </tr>
+                        ))
+                  }
                 </tbody>
               </table>
             </div>
@@ -415,7 +525,7 @@ export default function DashboardPage() {
                 : pieData.map((d) => (
                     <div key={d.name} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.color }} />
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.fill }} />
                         <span style={{ fontSize: 12, color: "#40516F" }}>{d.name}</span>
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#061A35" }}>{d.value}</span>
@@ -432,47 +542,6 @@ export default function DashboardPage() {
           </motion.div>
         </div>
 
-        {/* Quick stats — dados reais */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(6,1fr)" }}>
-          {bottomCards.map((card, i) => (
-            <motion.div
-              key={card.label}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + i * 0.05 }}
-              style={{
-                background: "#fff", border: "1px solid #DDE7F3",
-                borderRadius: 14, padding: "18px 20px",
-                boxShadow: "0 4px 16px rgba(15,39,68,0.05)",
-              }}
-              onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"
-                ;(e.currentTarget as HTMLElement).style.boxShadow = "0 12px 30px rgba(15,39,68,0.10)"
-              }}
-              onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLElement).style.transform = "translateY(0)"
-                ;(e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(15,39,68,0.05)"
-              }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <p style={{ fontSize: 12, fontWeight: 500, color: "#60708A", lineHeight: 1.3 }}>
-                  {card.label}
-                </p>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                     style={{ background: card.iconBg }}>
-                  <card.icon style={{ width: 16, height: 16, color: card.iconColor, strokeWidth: 2 }} />
-                </div>
-              </div>
-              {loadingMetrics && card.label !== "Conversas S/ Resposta" ? (
-                <Skeleton w="40%" />
-              ) : (
-                <p style={{ fontSize: 28, fontWeight: 700, color: "#061A35", lineHeight: 1 }}>
-                  {card.value ?? 0}
-                </p>
-              )}
-            </motion.div>
-          ))}
-        </div>
 
       </main>
     </>

@@ -25,16 +25,15 @@ interface ClientResult {
   phone: string | null
 }
 
-interface ClientHistoryItem {
-  id:                 number
-  os_number:          string
-  os_sequence:        string | null
-  situation:          string
-  purchase_date:      string | null
-  scheduled_delivery: string | null
-  store_id:           number | null
-  employee_name:      string | null
-  urgent:             boolean
+// Item unificado: pedido + garantia + solicitação
+interface UnifiedHistoryItem {
+  id:            number
+  type:          "pedido" | "garantia" | "solicitacao"
+  reference:     string        // OS "8519/17635" | "Garantia" | service_type
+  situation:     string
+  date:          string | null // purchase_date / request_date / created_at
+  store_id:      number | null
+  urgent:        boolean
 }
 
 interface UserProfile {
@@ -53,6 +52,30 @@ const primeiroDiaMes = new Date(
 ).toISOString().split("T")[0]
 
 const hoje = new Date().toISOString().split("T")[0]
+
+// ─── Validação matemática de CPF (dígitos verificadores) ─────────────────────
+
+function validarCpf(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, "")
+  if (d.length !== 11) return false
+  if (/^(\d)\1{10}$/.test(d)) return false          // "11111111111" etc.
+  let sum = 0
+  for (let i = 0; i < 9; i++) sum += +d[i] * (10 - i)
+  let r = (sum * 10) % 11; if (r >= 10) r = 0
+  if (r !== +d[9]) return false
+  sum = 0
+  for (let i = 0; i < 10; i++) sum += +d[i] * (11 - i)
+  r = (sum * 10) % 11; if (r >= 10) r = 0
+  return r === +d[10]
+}
+
+function mascaraCpf(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11)
+  if (d.length <= 3) return d
+  if (d.length <= 6) return `${d.slice(0,3)}.${d.slice(3)}`
+  if (d.length <= 9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`
+  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`
+}
 
 // ─── Badge de situação ────────────────────────────────────────────────────────
 
@@ -106,8 +129,12 @@ function NovoPedidoPageInner() {
   const [searchedOnce,   setSearchedOnce]   = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
 
-  // ── Histórico do cliente selecionado
-  const [clientHistory,  setClientHistory]  = useState<ClientHistoryItem[]>([])
+  // ── CPF do cliente (obrigatório no pedido)
+  const [clienteCpf,  setClienteCpf]  = useState("")
+  const [cpfError,    setCpfError]    = useState<string | null>(null)
+
+  // ── Histórico unificado do cliente (pedidos + garantias + solicitações)
+  const [clientHistory,  setClientHistory]  = useState<UnifiedHistoryItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
   // ── Dados do pedido
@@ -183,25 +210,71 @@ function NovoPedidoPageInner() {
     return () => document.removeEventListener("mousedown", handle)
   }, [])
 
-  // ─── Histórico do cliente ────────────────────────────────────────────────────
+  // ─── Histórico unificado do cliente (pedidos + garantias + solicitações) ───────
 
   useEffect(() => {
-    if (!selectedClient) {
-      setClientHistory([])
-      return
-    }
+    if (!selectedClient) { setClientHistory([]); return }
     setLoadingHistory(true)
     const sb = createSupabaseBrowserClient()
-    sb.from("service_orders")
-      .select("id, os_number, os_sequence, situation, purchase_date, scheduled_delivery, store_id, employee_name, urgent")
-      .eq("customer_id", selectedClient.id)
-      .is("deleted_at", null)
-      .order("id", { ascending: false })
-      .limit(20)
-      .then(({ data }) => {
-        setClientHistory((data as ClientHistoryItem[]) ?? [])
-        setLoadingHistory(false)
-      })
+
+    Promise.all([
+      // Pedidos — join por customer_id
+      sb.from("service_orders")
+        .select("id, os_number, os_sequence, situation, purchase_date, store_id, urgent")
+        .eq("customer_id", selectedClient.id)
+        .is("deleted_at", null)
+        .order("id", { ascending: false })
+        .limit(20),
+
+      // Garantias — sem customer_id na tabela; busca por nome
+      sb.from("warranties")
+        .select("id, situation, request_date, store_id, urgent")
+        .eq("customer_name", selectedClient.name)
+        .is("deleted_at", null)
+        .order("id", { ascending: false })
+        .limit(20),
+
+      // Solicitações — join por customer_id (sem campo urgent)
+      sb.from("requests")
+        .select("id, service_type, situation, created_at, store_id")
+        .eq("customer_id", selectedClient.id)
+        .is("deleted_at", null)
+        .order("id", { ascending: false })
+        .limit(20),
+    ]).then(([ordRes, warRes, reqRes]) => {
+      const items: UnifiedHistoryItem[] = [
+        ...(ordRes.data ?? []).map((o: { id: number; os_number: string; os_sequence: string | null; situation: string; purchase_date: string | null; store_id: number | null; urgent: boolean }) => ({
+          id:        o.id,
+          type:      "pedido"    as const,
+          reference: o.os_sequence ? `${o.os_number}/${o.os_sequence}` : o.os_number,
+          situation: o.situation ?? "—",
+          date:      o.purchase_date,
+          store_id:  o.store_id,
+          urgent:    o.urgent,
+        })),
+        ...(warRes.data ?? []).map((w: { id: number; situation: string | null; request_date: string | null; store_id: number | null; urgent: boolean }) => ({
+          id:        w.id,
+          type:      "garantia"  as const,
+          reference: `Garantia #${w.id}`,
+          situation: w.situation ?? "—",
+          date:      w.request_date,
+          store_id:  w.store_id,
+          urgent:    w.urgent,
+        })),
+        ...(reqRes.data ?? []).map((r: { id: number; service_type: string; situation: string; created_at: string; store_id: number | null }) => ({
+          id:        r.id,
+          type:      "solicitacao" as const,
+          reference: r.service_type ?? `Serviço #${r.id}`,
+          situation: r.situation ?? "—",
+          date:      r.created_at?.split("T")[0] ?? null,
+          store_id:  r.store_id,
+          urgent:    false, // requests não têm campo urgent
+        })),
+      ].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
+
+      setClientHistory(items)
+      setLoadingHistory(false)
+    })
   }, [selectedClient])
 
   // ─── Funcionários filtrados por loja ────────────────────────────────────────
@@ -223,17 +296,13 @@ function NovoPedidoPageInner() {
       setSearching(true)
       const sb = createSupabaseBrowserClient()
 
-      const digits       = searchTerm.replace(/\D/g, "")
-      const cpfFormatado = digits.length === 11
-        ? `${digits.slice(0,3)}.${digits.slice(3,6)}.${digits.slice(6,9)}-${digits.slice(9,11)}`
-        : null
-
+      // Busca apenas por nome e telefone — CPF removido
+      // (CPF tem problemas de qualidade nos dados históricos; coletado separado no formulário)
+      const digits  = searchTerm.replace(/\D/g, "")
       const filtros = [
         `name.ilike.%${searchTerm}%`,
-        digits.length >= 3 ? `cpf.ilike.%${digits}%`       : null,
-        cpfFormatado       ? `cpf.ilike.%${cpfFormatado}%`  : null,
         `phone.ilike.%${searchTerm}%`,
-        digits.length >= 3 ? `phone.ilike.%${digits}%`      : null,
+        digits.length >= 3 ? `phone.ilike.%${digits}%` : null,
       ].filter(Boolean).join(",")
 
       const { data, error } = await sb
@@ -259,6 +328,8 @@ function NovoPedidoPageInner() {
     setSelectedClient(c)
     setShowDropdown(false)
     setSearchTerm(c.name)
+    setClienteCpf(c.cpf ? mascaraCpf(c.cpf) : "")
+    setCpfError(null)
   }
 
   function clearClient() {
@@ -266,6 +337,8 @@ function NovoPedidoPageInner() {
     setSearchTerm("")
     setSearchResults([])
     setSearchedOnce(false)
+    setClienteCpf("")
+    setCpfError(null)
   }
 
   // ─── Submissão ──────────────────────────────────────────────────────────────
@@ -289,6 +362,17 @@ function NovoPedidoPageInner() {
     }
     if (!osSequencia.trim()) {
       setError("Informe a Sequência (Shop9).")
+      return
+    }
+
+    // Valida CPF
+    const cpfDigits = clienteCpf.replace(/\D/g, "")
+    if (!cpfDigits) {
+      setError("Informe o CPF do cliente.")
+      return
+    }
+    if (!validarCpf(cpfDigits)) {
+      setError("CPF inválido — verifique os dígitos.")
       return
     }
 
@@ -337,7 +421,14 @@ function NovoPedidoPageInner() {
       return
     }
 
-    // 4. Registra histórico inicial
+    // 4. Salva CPF no cliente se foi inserido ou corrigido
+    const cpfFormatado = mascaraCpf(cpfDigits)
+    if (cpfFormatado !== selectedClient.cpf) {
+      setSavingStep("Atualizando CPF do cliente...")
+      await sb.from("customers").update({ cpf: cpfFormatado }).eq("id", selectedClient.id)
+    }
+
+    // 5. Registra histórico inicial
     setSavingStep("Registrando histórico...")
     await sb.from("service_order_histories").insert({
       service_order_id: newOrder.id,
@@ -484,7 +575,7 @@ function NovoPedidoPageInner() {
               {/* Cliente selecionado */}
               {selectedClient && (
                 <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-xl space-y-2"
+                  className="p-4 rounded-xl space-y-3"
                   style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
                   <div className="flex items-center gap-2">
                     <Check className="w-4 h-4" style={{ color: "#1d4ed8" }} />
@@ -496,8 +587,49 @@ function NovoPedidoPageInner() {
                     {selectedClient.name}
                   </p>
                   <p className="text-xs" style={{ color: "#556376" }}>
-                    {selectedClient.cpf ?? "Sem CPF"} · {selectedClient.phone ?? "Sem telefone"}
+                    {selectedClient.phone ?? "Sem telefone"}
                   </p>
+
+                  {/* CPF — obrigatório */}
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1"
+                      style={{ color: "#1d4ed8" }}>
+                      CPF <span style={{ color: "#dc2626" }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      maxLength={14}
+                      value={clienteCpf}
+                      onChange={e => {
+                        const v = mascaraCpf(e.target.value)
+                        setClienteCpf(v)
+                        const d = v.replace(/\D/g, "")
+                        if (d.length === 11) {
+                          setCpfError(validarCpf(d) ? null : "CPF inválido — verifique os dígitos")
+                        } else {
+                          setCpfError(null)
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl text-sm border outline-none transition-colors font-mono"
+                      style={{
+                        background: "#fff",
+                        borderColor: cpfError ? "#dc2626" : clienteCpf.replace(/\D/g,"").length === 11 && !cpfError ? "#16a34a" : "#bfdbfe",
+                        color: "#121212",
+                      }}
+                    />
+                    {cpfError && (
+                      <p className="mt-1 text-xs flex items-center gap-1" style={{ color: "#dc2626" }}>
+                        <AlertTriangle className="w-3 h-3" /> {cpfError}
+                      </p>
+                    )}
+                    {!cpfError && clienteCpf.replace(/\D/g,"").length === 11 && (
+                      <p className="mt-1 text-xs flex items-center gap-1" style={{ color: "#16a34a" }}>
+                        <Check className="w-3 h-3" /> CPF válido
+                      </p>
+                    )}
+                  </div>
                 </motion.div>
               )}
 
@@ -742,7 +874,7 @@ function NovoPedidoPageInner() {
                     className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
                     style={{ background: "#eff6ff", color: "#1d4ed8" }}
                   >
-                    {clientHistory.length} {clientHistory.length === 1 ? "pedido" : "pedidos"}
+                    {clientHistory.length} {clientHistory.length === 1 ? "registro" : "registros"}
                   </span>
                 )}
               </div>
@@ -755,12 +887,12 @@ function NovoPedidoPageInner() {
                 </div>
               )}
 
-              {/* Sem pedidos */}
+              {/* Sem registros */}
               {!loadingHistory && clientHistory.length === 0 && (
                 <div className="py-6 flex flex-col items-center gap-2">
                   <ShoppingBag className="w-9 h-9" style={{ color: "#cbd5e1" }} />
                   <p className="text-sm" style={{ color: "#7e8b9c" }}>
-                    Nenhum pedido anterior encontrado para este cliente.
+                    Nenhum registro encontrado para este cliente.
                   </p>
                 </div>
               )}
@@ -771,7 +903,7 @@ function NovoPedidoPageInner() {
                   <table className="w-full text-sm border-collapse">
                     <thead>
                       <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
-                        {["OS / Seq.", "Data compra", "Loja", "Vendedor", "Situação", ""].map(h => (
+                        {["Tipo", "Referência", "Data", "Loja", "Situação", ""].map(h => (
                           <th key={h} className="pb-2.5 text-left text-xs font-semibold uppercase tracking-wide pr-4"
                             style={{ color: "#556376" }}>
                             {h}
@@ -780,59 +912,67 @@ function NovoPedidoPageInner() {
                       </tr>
                     </thead>
                     <tbody>
-                      {clientHistory.map((h, i) => (
-                        <tr
-                          key={h.id}
-                          className="transition-colors hover:bg-slate-50"
-                          style={{ borderBottom: i < clientHistory.length - 1 ? "1px solid #f1f5f9" : "none" }}
-                        >
-                          {/* OS */}
-                          <td className="py-2.5 pr-4">
-                            <span className="font-mono font-semibold text-sm" style={{ color: "#121212" }}>
-                              {h.os_number}
-                            </span>
-                            {h.os_sequence && (
-                              <span className="text-xs ml-1" style={{ color: "#7e8b9c" }}>
-                                · {h.os_sequence}
+                      {clientHistory.map((h, i) => {
+                        const typeStyle = {
+                          pedido:      { bg: "#eff6ff", text: "#1d4ed8", label: "Pedido"    },
+                          garantia:    { bg: "#fff7ed", text: "#c2410c", label: "Garantia"  },
+                          solicitacao: { bg: "#fdf4ff", text: "#7e22ce", label: "Serviço"   },
+                        }[h.type]
+                        const href = h.type === "pedido"
+                          ? `/pedidos/${h.id}`
+                          : h.type === "garantia"
+                            ? `/garantias/${h.id}`
+                            : `/solicitacoes/${h.id}`
+                        return (
+                          <tr
+                            key={`${h.type}-${h.id}`}
+                            className="transition-colors hover:bg-slate-50"
+                            style={{ borderBottom: i < clientHistory.length - 1 ? "1px solid #f1f5f9" : "none" }}
+                          >
+                            {/* Tipo */}
+                            <td className="py-2.5 pr-4">
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                                style={{ background: typeStyle.bg, color: typeStyle.text }}>
+                                {typeStyle.label}
                               </span>
-                            )}
-                          </td>
+                            </td>
 
-                          {/* Data */}
-                          <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
-                            {h.purchase_date
-                              ? new Date(h.purchase_date + "T12:00:00").toLocaleDateString("pt-BR")
-                              : "—"}
-                          </td>
+                            {/* Referência */}
+                            <td className="py-2.5 pr-4">
+                              <span className="font-mono font-medium text-sm" style={{ color: "#121212" }}>
+                                {h.reference}
+                              </span>
+                            </td>
 
-                          {/* Loja */}
-                          <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
-                            {stores.find(s => s.id === h.store_id)?.name ?? "—"}
-                          </td>
+                            {/* Data */}
+                            <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
+                              {h.date
+                                ? new Date(h.date + "T12:00:00").toLocaleDateString("pt-BR")
+                                : "—"}
+                            </td>
 
-                          {/* Vendedor */}
-                          <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
-                            {h.employee_name ?? "—"}
-                          </td>
+                            {/* Loja */}
+                            <td className="py-2.5 pr-4 text-sm" style={{ color: "#3c4859" }}>
+                              {stores.find(s => s.id === h.store_id)?.name ?? "—"}
+                            </td>
 
-                          {/* Situação */}
-                          <td className="py-2.5 pr-4">
-                            <SitBadge situation={h.situation} urgent={h.urgent} />
-                          </td>
+                            {/* Situação */}
+                            <td className="py-2.5 pr-4">
+                              <SitBadge situation={h.situation} urgent={h.urgent} />
+                            </td>
 
-                          {/* Link */}
-                          <td className="py-2.5">
-                            <Link
-                              href={`/pedidos/${h.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-medium transition-colors hover:underline"
-                              style={{ color: "#1d4ed8" }}
-                            >
-                              Ver
-                              <ExternalLink className="w-3 h-3" />
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
+                            {/* Link */}
+                            <td className="py-2.5">
+                              <Link href={href}
+                                className="inline-flex items-center gap-1 text-xs font-medium transition-colors hover:underline"
+                                style={{ color: "#1d4ed8" }}>
+                                Ver
+                                <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

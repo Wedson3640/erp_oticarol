@@ -2,12 +2,20 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "ERP Ótica Carol",
-  description: "Sistema de Gestão — Ótica Carol · Teresina, PI",
+  title: "Leão Vision ERP",
+  description: "Sistema de gestão do Grupo Leão — Piauí · Brasil",
+  openGraph: {
+    title: "Leão Vision ERP",
+    description: "Sistema de gestão do Grupo Leão — Piauí · Brasil",
+    url: "https://app.oticascarolpi.com",
+    siteName: "Leão Vision ERP",
+    locale: "pt_BR",
+    type: "website",
+  },
   icons: {
-    icon: [{ url: "/favico leaoescuro2.png", type: "image/png" }],
-    shortcut: [{ url: "/favico leaoescuro2.png", type: "image/png" }],
-    apple: [{ url: "/favico leaoescuro2.png", type: "image/png" }],
+    icon: [{ url: "/leao-fundo-branco.png", type: "image/png" }],
+    shortcut: [{ url: "/leao-fundo-branco.png", type: "image/png" }],
+    apple: [{ url: "/leao-fundo-branco.png", type: "image/png" }],
   },
 }
 

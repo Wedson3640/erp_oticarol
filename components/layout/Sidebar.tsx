@@ -254,12 +254,17 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 pt-6 pb-4">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.18)" }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.18)" }}
           >
-            <Glasses className="w-5 h-5 text-white" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/leao_branco.png" alt="Leão Vision" className="w-7 h-7 object-contain" />
           </div>
-          <span className="text-white font-bold text-xl tracking-tight">Ótica Carol</span>
+          <span className="font-bold text-xl tracking-tight leading-none">
+            <span style={{ color: "#FFFFFF" }}>Leão </span>
+            <span style={{ color: "#7EB8FF" }}>Vision </span>
+            <span style={{ color: "#FBBF24" }}>ERP</span>
+          </span>
         </div>
 
         {/* Nav */}

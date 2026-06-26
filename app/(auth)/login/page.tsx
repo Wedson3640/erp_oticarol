@@ -387,8 +387,8 @@ function LoginPageInner() {
               {/* ── Cabeçalho: logo + título + acesso corporativo ── */}
               <div style={{ marginBottom: 24, fontFamily: "'Inter', sans-serif" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-                  <div style={{ width: 46, height: 46, borderRadius: 12, overflow: "hidden", flexShrink: 0, boxShadow: "0 2px 10px rgba(0,0,0,0.15)" }}>
-                    <Image src="/favico%20leaoescuro2.png" alt="Leão Vision" width={46} height={46} style={{ objectFit: "cover" }} />
+                  <div style={{ width: 46, height: 46, borderRadius: 12, overflow: "hidden", flexShrink: 0, boxShadow: "0 2px 10px rgba(0,0,0,0.10)", background: "#fff" }}>
+                    <Image src="/leao-fundo-branco.png" alt="Leão Vision" width={46} height={46} style={{ objectFit: "contain" }} />
                   </div>
                   <div>
                     <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: "#0B1220" }}>
