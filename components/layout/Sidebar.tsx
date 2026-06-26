@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   ShoppingBag, ClipboardList, Shield, MessageCircle,
   Target, Users, UserCheck, Truck, Tag, Eye,
-  FlaskConical, Building2, Lock, LogOut, Glasses,
+  FlaskConical, Building2, Lock, LogOut,
   BarChart3,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -18,10 +18,11 @@ const navGroups = [
   {
     label: "OPERACIONAL",
     items: [
-      { icon: ShoppingBag,   label: "Pedidos",      href: "/pedidos"      },
-      { icon: ClipboardList, label: "Solicitações",  href: "/solicitacoes" },
-      { icon: Shield,        label: "Garantias",     href: "/garantias"    },
-      { icon: MessageCircle, label: "Conversas/CRM", href: "/conversas"    },
+      { icon: ShoppingBag,   label: "Pedidos",        href: "/pedidos"      },
+      { icon: ClipboardList, label: "Solicitações",    href: "/solicitacoes" },
+      { icon: Shield,        label: "Garantias",       href: "/garantias"    },
+      { icon: MessageCircle, label: "Conversas/CRM",   href: "/conversas"    },
+      { icon: FlaskConical,  label: "Lab / Produção",  href: "/laboratorio"  },
     ],
   },
   {
