@@ -1,470 +1,471 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Header } from "@/components/layout/Header"
-import { supabase } from "@/lib/supabase"
-import {
-  FlaskConical, RefreshCw, CheckCircle2, AlertTriangle,
-  Clock, Package, Shield, ClipboardList, Filter,
-} from "lucide-react"
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { AlertTriangle, Clock, CheckCircle2, RefreshCw, FlaskConical, Filter } from "lucide-react"
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const FINALIZADAS = ["Entregue ao Cliente", "Entregue", "Cancelado", "Pronto para Entrega"]
+const SITUACOES_VISIVEIS = [
+  "Pedido criado",
+  "Compras",
+  "Compras interna",
+  "Enviado ao laboratório",
+  "Recebido no laboratório",
+  "Em montagem",
+  "Controle de qualidade",
+]
 
-type Tipo = "pedido" | "garantia" | "solicitacao"
+type Prioridade = "urgente" | "proximo" | "prazo" | "sem_data"
+type TipoItem  = "pedido" | "garantia" | "solicitacao"
 
-interface FilaItem {
-  id:         number
-  tipo:       Tipo
-  tipo_label: string
-  ref:        string        // OS número ou id formatado
-  customer:   string | null
-  store:      string | null
-  situation:  string | null
-  delivery:   string | null // ISO date
-  urgent:     boolean
-  priority:   "urgente" | "proximo" | "prazo" | "sem_data"
+interface FilaRow {
+  id:          number
+  tipo:        TipoItem
+  os:          string          // "OS 1234/5678" ou "GAR-00001"
+  loja:        string | null
+  cliente:     string | null
+  vendedor:    string | null
+  produto:     string | null   // notes / lab_os_number
+  compra:      string | null   // purchase_date ISO
+  prazo:       string | null   // scheduled_delivery ISO
+  situacao:    string | null   // situação atual (do campo situation)
+  urgente:     boolean
+  prioridade:  Prioridade
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const hoje = () => {
-  const d = new Date(); d.setHours(0,0,0,0); return d
+const hojeMs = () => {
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
 }
 
-const calcPriority = (delivery: string | null, urgent: boolean): FilaItem["priority"] => {
-  if (urgent) return "urgente"
-  if (!delivery) return "sem_data"
-  const d = new Date(delivery + "T00:00:00"); d.setHours(0,0,0,0)
-  const h = hoje()
-  const diff = Math.floor((d.getTime() - h.getTime()) / 86400000)
+const calcPrioridade = (prazo: string | null, urgente: boolean): Prioridade => {
+  if (urgente) return "urgente"
+  if (!prazo)  return "sem_data"
+  const diff = Math.floor(
+    (new Date(prazo + "T00:00:00").setHours(0, 0, 0, 0) - hojeMs()) / 86400000
+  )
   if (diff <= 0) return "urgente"
-  if (diff <= 3)  return "proximo"
+  if (diff <= 3) return "proximo"
   return "prazo"
 }
 
-const PRIORITY_ORDER: Record<FilaItem["priority"], number> = {
+const ORDEM_PRIORIDADE: Record<Prioridade, number> = {
   urgente: 0, proximo: 1, prazo: 2, sem_data: 3,
 }
 
-const fmtDelivery = (iso: string | null) => {
+const fmtData = (iso: string | null) => {
   if (!iso) return "—"
   const [y, m, d] = iso.split("-")
   return `${d}/${m}/${y}`
 }
 
-const diffDias = (iso: string | null) => {
-  if (!iso) return null
-  const d = new Date(iso + "T00:00:00"); d.setHours(0,0,0,0)
-  return Math.floor((d.getTime() - hoje().getTime()) / 86400000)
-}
-
-// ─── Badges ──────────────────────────────────────────────────────────────────
-
-const PRIORITY_META: Record<FilaItem["priority"], { label: string; bg: string; color: string; icon: typeof AlertTriangle }> = {
-  urgente:  { label: "URGENTE",          bg: "#fee2e2", color: "#dc2626", icon: AlertTriangle },
-  proximo:  { label: "PRÓXIMO A VENCER", bg: "#fef3c7", color: "#d97706", icon: Clock         },
-  prazo:    { label: "NO PRAZO",         bg: "#dcfce7", color: "#16a34a", icon: CheckCircle2  },
-  sem_data: { label: "SEM DATA",         bg: "#f1f5f9", color: "#64748b", icon: Clock         },
-}
-
-const TIPO_META: Record<Tipo, { label: string; bg: string; color: string; icon: typeof Package }> = {
-  pedido:     { label: "PEDIDO",      bg: "#dbeafe", color: "#1d4ed8", icon: Package       },
-  garantia:   { label: "GARANTIA",    bg: "#f3e8ff", color: "#7c3aed", icon: Shield        },
-  solicitacao:{ label: "SOLICITAÇÃO", bg: "#ffedd5", color: "#c2410c", icon: ClipboardList },
-}
-
-// ─── Componente de card ────────────────────────────────────────────────────────
-
-function QueueCard({
-  item, onMarcarPronto, marking,
-}: {
-  item: FilaItem
-  onMarcarPronto: (item: FilaItem) => void
-  marking: boolean
-}) {
-  const pm = PRIORITY_META[item.priority]
-  const tm = TIPO_META[item.tipo]
-  const dias = diffDias(item.delivery)
-  const PIcon = pm.icon
-  const TIcon = tm.icon
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      style={{
-        background: "#fff",
-        border: `1px solid ${item.priority === "urgente" ? "#fca5a5" : item.priority === "proximo" ? "#fde68a" : "#DDE7F3"}`,
-        borderRadius: 14,
-        padding: "14px 18px",
-        boxShadow: item.priority === "urgente" ? "0 0 0 2px #fca5a520" : "0 2px 8px rgba(15,39,68,0.04)",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-      }}
-    >
-      {/* Stripe lateral de prioridade */}
-      <div style={{ width: 4, height: 52, borderRadius: 4, background: pm.color, flexShrink: 0 }} />
-
-      {/* Ref + cliente */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="flex items-center gap-2 flex-wrap mb-1">
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{ background: tm.bg, color: tm.color }}>
-            <TIcon className="w-3 h-3" />
-            {tm.label}
-          </span>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#061A35" }}>{item.ref}</span>
-        </div>
-        <p style={{ fontSize: 13, color: "#2F4162", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {item.customer ?? "Cliente não informado"}
-        </p>
-        {item.store && (
-          <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{item.store}</p>
-        )}
-      </div>
-
-      {/* Situação atual */}
-      <div style={{ textAlign: "center", minWidth: 120 }}>
-        {item.situation && (
-          <span className="px-2 py-1 rounded-lg text-xs font-medium"
-            style={{ background: "#f1f5f9", color: "#475569" }}>
-            {item.situation}
-          </span>
-        )}
-      </div>
-
-      {/* Prazo */}
-      <div style={{ textAlign: "center", minWidth: 100 }}>
-        <p style={{ fontSize: 14, fontWeight: 700, color: pm.color }}>{fmtDelivery(item.delivery)}</p>
-        <p style={{ fontSize: 11, color: pm.color, marginTop: 2 }}>
-          {dias === null ? "sem data" :
-           dias < 0  ? `${Math.abs(dias)}d atrasado` :
-           dias === 0 ? "vence hoje" :
-           `${dias}d restantes`}
-        </p>
-      </div>
-
-      {/* Badge prioridade */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-        style={{ background: pm.bg, minWidth: 110, justifyContent: "center" }}>
-        <PIcon className="w-3.5 h-3.5" style={{ color: pm.color }} />
-        <span style={{ fontSize: 11, fontWeight: 700, color: pm.color }}>{pm.label}</span>
-      </div>
-
-      {/* Botão */}
-      <motion.button
-        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-        onClick={() => onMarcarPronto(item)}
-        disabled={marking}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white flex-shrink-0"
-        style={{ background: marking ? "#94a3b8" : "#0f2744", minWidth: 140 }}
-      >
-        <CheckCircle2 className="w-4 h-4" />
-        Marcar Pronto
-      </motion.button>
-    </motion.div>
+const diasRestantes = (iso: string | null): string => {
+  if (!iso) return ""
+  const diff = Math.floor(
+    (new Date(iso + "T00:00:00").setHours(0, 0, 0, 0) - hojeMs()) / 86400000
   )
+  if (diff < 0)  return `${Math.abs(diff)}d atrasado`
+  if (diff === 0) return "hoje"
+  return `+${diff}d`
 }
 
-// ─── Seção por prioridade ────────────────────────────────────────────────────
-
-function PrioritySection({
-  priority, items, onMarcarPronto, markingId,
-}: {
-  priority: FilaItem["priority"]
-  items: FilaItem[]
-  onMarcarPronto: (item: FilaItem) => void
-  markingId: number | null
-}) {
-  if (items.length === 0) return null
-  const meta = PRIORITY_META[priority]
-  const Icon = meta.icon
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3 px-1">
-        <Icon className="w-5 h-5" style={{ color: meta.color }} />
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#061A35" }}>
-          {meta.label}
-          <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{ background: meta.bg, color: meta.color }}>
-            {items.length}
-          </span>
-        </h3>
-        <div style={{ flex: 1, height: 1, background: "#EAF2FF" }} />
-      </div>
-      <AnimatePresence mode="popLayout">
-        {items.map(item => (
-          <QueueCard
-            key={`${item.tipo}-${item.id}`}
-            item={item}
-            onMarcarPronto={onMarcarPronto}
-            marking={markingId === item.id}
-          />
-        ))}
-      </AnimatePresence>
-    </div>
-  )
+const PRIORIDADE_STYLE: Record<Prioridade, {
+  rowBg: string; stripe: string; badge: string; badgeTxt: string
+  icon: typeof AlertTriangle; label: string
+}> = {
+  urgente:  { rowBg: "#fff5f5", stripe: "#dc2626", badge: "#fee2e2", badgeTxt: "#dc2626", icon: AlertTriangle, label: "URGENTE"          },
+  proximo:  { rowBg: "#fffbeb", stripe: "#d97706", badge: "#fef3c7", badgeTxt: "#d97706", icon: Clock,         label: "PRÓXIMO A VENCER" },
+  prazo:    { rowBg: "#f0fdf4", stripe: "#16a34a", badge: "#dcfce7", badgeTxt: "#16a34a", icon: CheckCircle2,  label: "NO PRAZO"         },
+  sem_data: { rowBg: "#f8fafc", stripe: "#94a3b8", badge: "#f1f5f9", badgeTxt: "#64748b", icon: Clock,         label: "SEM DATA"         },
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
+const TIPO_LABEL: Record<TipoItem, string> = {
+  pedido: "PED", garantia: "GAR", solicitacao: "SOL",
+}
+const TIPO_COLOR: Record<TipoItem, { bg: string; txt: string }> = {
+  pedido:      { bg: "#dbeafe", txt: "#1d4ed8" },
+  garantia:    { bg: "#f3e8ff", txt: "#7c3aed" },
+  solicitacao: { bg: "#ffedd5", txt: "#c2410c" },
+}
+
+// ─── Página ──────────────────────────────────────────────────────────────────
 
 export default function LaboratorioPage() {
-  const [fila, setFila]           = useState<FilaItem[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [markingId, setMarkingId] = useState<number | null>(null)
-  const [filtroTipo, setFiltroTipo] = useState<Set<Tipo>>(new Set(["pedido", "garantia", "solicitacao"]))
-  const [autoRefresh, setAutoRefresh] = useState(false)
-  const [lastUpdate, setLastUpdate]   = useState<Date>(new Date())
+  const [fila,        setFila]        = useState<FilaRow[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [ultimaAtt,   setUltimaAtt]   = useState<Date>(new Date())
+  const [filtroTipo,  setFiltroTipo]  = useState<Set<TipoItem>>(new Set(["pedido", "garantia", "solicitacao"]))
+  const [hora, setHora] = useState("")
+
+  // Relógio em tempo real
+  useEffect(() => {
+    const tick = () => setHora(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }))
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [])
 
   // ── Carrega dados ──────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
-    const notIn = `(${FINALIZADAS.join(",")})`
+    const sb = createSupabaseBrowserClient()
 
-    // Busca os 3 tipos em paralelo
-    const [rPedidos, rGarantias, rSolicitacoes] = await Promise.all([
-      supabase.schema("sascarol")
-        .from("service_orders")
-        .select("id, os_number, os_sequence, situation, scheduled_delivery, urgent, customer_name, store:stores!store_id(code,name)")
-        .not("situation", "is", null)
-        .not("situation", "in", notIn)
-        .order("scheduled_delivery", { ascending: true, nullsFirst: false }),
+    const [rPed, rGar, rSol] = await Promise.all([
+      sb.from("service_orders")
+        .select("id, os_number, os_sequence, situation, urgent, purchase_date, scheduled_delivery, notes, lab_os_number, customer_name, employee_name, store:stores!store_id(code,name)")
+        .in("situation", SITUACOES_VISIVEIS)
+        .gte("purchase_date", "2026-01-01")
+        .order("scheduled_delivery", { ascending: true, nullsFirst: false })
+        .limit(500),
 
-      supabase.schema("sascarol")
-        .from("warranties")
-        .select("id, situation, scheduled_delivery, customer_name, store:stores!store_id(code,name)")
-        .not("situation", "is", null)
-        .not("situation", "in", notIn)
-        .order("scheduled_delivery", { ascending: true, nullsFirst: false }),
+      sb.from("warranties")
+        .select("id, situation, scheduled_delivery, customer_name, request_date, store:stores!store_id(code,name)")
+        .in("situation", SITUACOES_VISIVEIS)
+        .gte("request_date", "2026-01-01")
+        .order("scheduled_delivery", { ascending: true, nullsFirst: false })
+        .limit(200),
 
-      supabase.schema("sascarol")
-        .from("requests")
-        .select("id, situation, scheduled_delivery, customer_name, store:stores!store_id(code,name)")
-        .not("situation", "is", null)
-        .not("situation", "in", notIn)
-        .order("scheduled_delivery", { ascending: true, nullsFirst: false }),
+      sb.from("requests")
+        .select("id, situation, scheduled_delivery, customer_name, created_at, store:stores!store_id(code,name)")
+        .in("situation", SITUACOES_VISIVEIS)
+        .gte("created_at", "2026-01-01")
+        .order("scheduled_delivery", { ascending: true, nullsFirst: false })
+        .limit(200),
     ])
 
-    const items: FilaItem[] = []
+    const rows: FilaRow[] = []
 
     // Pedidos
-    for (const p of (rPedidos.data ?? []) as any[]) {
+    for (const p of (rPed.data ?? []) as any[]) {
       const store = Array.isArray(p.store) ? p.store[0] : p.store
-      const os = p.os_number + (p.os_sequence ? `/${p.os_sequence}` : "")
-      items.push({
-        id: p.id, tipo: "pedido", tipo_label: "Pedido",
-        ref: `OS ${os}`,
-        customer: p.customer_name,
-        store: store ? `Loja ${store.code} · ${store.name}` : null,
-        situation: p.situation,
-        delivery: p.scheduled_delivery,
-        urgent: !!p.urgent,
-        priority: calcPriority(p.scheduled_delivery, !!p.urgent),
+      const lojaStr = store ? `${store.code} · ${store.name}` : null
+      const osSuffix = p.os_sequence ? `/${p.os_sequence}` : ""
+      const produto = p.lab_os_number
+        ? `OS Lab: ${p.lab_os_number}`
+        : p.notes
+          ? p.notes.slice(0, 60)
+          : null
+      rows.push({
+        id: p.id, tipo: "pedido",
+        os: `${p.os_number}${osSuffix}`,
+        loja: lojaStr,
+        cliente: p.customer_name,
+        vendedor: p.employee_name,
+        produto,
+        compra: p.purchase_date,
+        prazo: p.scheduled_delivery,
+        situacao: p.situation,
+        urgente: !!p.urgent,
+        prioridade: calcPrioridade(p.scheduled_delivery, !!p.urgent),
       })
     }
 
     // Garantias
-    for (const g of (rGarantias.data ?? []) as any[]) {
+    for (const g of (rGar.data ?? []) as any[]) {
       const store = Array.isArray(g.store) ? g.store[0] : g.store
-      items.push({
-        id: g.id, tipo: "garantia", tipo_label: "Garantia",
-        ref: `GAR-${String(g.id).padStart(5, "0")}`,
-        customer: g.customer_name,
-        store: store ? `Loja ${store.code} · ${store.name}` : null,
-        situation: g.situation,
-        delivery: g.scheduled_delivery,
-        urgent: false,
-        priority: calcPriority(g.scheduled_delivery, false),
+      rows.push({
+        id: g.id, tipo: "garantia",
+        os: `GAR-${String(g.id).padStart(5, "0")}`,
+        loja: store ? `${store.code} · ${store.name}` : null,
+        cliente: g.customer_name,
+        vendedor: null,
+        produto: null,
+        compra: g.request_date ?? null,
+        prazo: g.scheduled_delivery,
+        situacao: g.situation,
+        urgente: false,
+        prioridade: calcPrioridade(g.scheduled_delivery, false),
       })
     }
 
     // Solicitações
-    for (const s of (rSolicitacoes.data ?? []) as any[]) {
+    for (const s of (rSol.data ?? []) as any[]) {
       const store = Array.isArray(s.store) ? s.store[0] : s.store
-      items.push({
-        id: s.id, tipo: "solicitacao", tipo_label: "Solicitação",
-        ref: `SOL-${String(s.id).padStart(5, "0")}`,
-        customer: s.customer_name,
-        store: store ? `Loja ${store.code} · ${store.name}` : null,
-        situation: s.situation,
-        delivery: s.scheduled_delivery,
-        urgent: false,
-        priority: calcPriority(s.scheduled_delivery, false),
+      rows.push({
+        id: s.id, tipo: "solicitacao",
+        os: `SOL-${String(s.id).padStart(5, "0")}`,
+        loja: store ? `${store.code} · ${store.name}` : null,
+        cliente: s.customer_name,
+        vendedor: null,
+        produto: null,
+        compra: s.created_at ? s.created_at.slice(0, 10) : null,
+        prazo: s.scheduled_delivery,
+        situacao: s.situation,
+        urgente: false,
+        prioridade: calcPrioridade(s.scheduled_delivery, false),
       })
     }
 
-    // Ordena: prioridade → data de entrega
-    items.sort((a, b) => {
-      const po = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+    // Ordenação: prioridade → prazo
+    rows.sort((a, b) => {
+      const po = ORDEM_PRIORIDADE[a.prioridade] - ORDEM_PRIORIDADE[b.prioridade]
       if (po !== 0) return po
-      if (!a.delivery && !b.delivery) return 0
-      if (!a.delivery) return 1
-      if (!b.delivery) return -1
-      return a.delivery.localeCompare(b.delivery)
+      if (!a.prazo && !b.prazo) return 0
+      if (!a.prazo) return 1
+      if (!b.prazo) return -1
+      return a.prazo.localeCompare(b.prazo)
     })
 
-    setFila(items)
-    setLastUpdate(new Date())
+    setFila(rows)
+    setUltimaAtt(new Date())
     setLoading(false)
   }, [])
 
+  // Carga inicial + auto-refresh a cada 60s
   useEffect(() => { load() }, [load])
-
-  // Auto-refresh a cada 60s
   useEffect(() => {
-    if (!autoRefresh) return
-    const t = setInterval(() => load(), 60_000)
+    const t = setInterval(load, 60_000)
     return () => clearInterval(t)
-  }, [autoRefresh, load])
-
-  // ── Marcar como Pronto ─────────────────────────────────────────────────────
-  const handleMarcarPronto = async (item: FilaItem) => {
-    setMarkingId(item.id)
-    const tabela = item.tipo === "pedido" ? "service_orders"
-                 : item.tipo === "garantia" ? "warranties"
-                 : "requests"
-
-    await supabase.schema("sascarol")
-      .from(tabela)
-      .update({ situation: "Pronto para Entrega" })
-      .eq("id", item.id)
-
-    // Remove da fila localmente (otimista)
-    setFila(prev => prev.filter(i => !(i.tipo === item.tipo && i.id === item.id)))
-    setMarkingId(null)
-  }
+  }, [load])
 
   // ── Filtragem ──────────────────────────────────────────────────────────────
-  const toggleTipo = (t: Tipo) => {
+  const toggleTipo = (t: TipoItem) =>
     setFiltroTipo(prev => {
       const next = new Set(prev)
       next.has(t) ? next.delete(t) : next.add(t)
-      return next.size === 0 ? prev : next // nunca deixa vazio
+      return next.size === 0 ? prev : next
     })
-  }
 
-  const filaFiltrada = fila.filter(i => filtroTipo.has(i.tipo))
+  const filaFiltrada = fila.filter(r => filtroTipo.has(r.tipo))
 
-  const byPriority = (p: FilaItem["priority"]) =>
-    filaFiltrada.filter(i => i.priority === p)
-
-  // ── Totais ─────────────────────────────────────────────────────────────────
-  const totais = {
-    urgente: filaFiltrada.filter(i => i.priority === "urgente").length,
-    proximo: filaFiltrada.filter(i => i.priority === "proximo").length,
-    prazo:   filaFiltrada.filter(i => i.priority === "prazo").length,
-    sem_data:filaFiltrada.filter(i => i.priority === "sem_data").length,
+  // ── Contadores ─────────────────────────────────────────────────────────────
+  const contadores = {
+    urgente:  filaFiltrada.filter(r => r.prioridade === "urgente").length,
+    proximo:  filaFiltrada.filter(r => r.prioridade === "proximo").length,
+    prazo:    filaFiltrada.filter(r => r.prioridade === "prazo").length,
+    sem_data: filaFiltrada.filter(r => r.prioridade === "sem_data").length,
+    total:    filaFiltrada.length,
   }
 
   return (
     <>
       <Header breadcrumbs={["Home", "Lab / Produção"]} title="Fila de Produção" />
 
-      <main className="pt-[64px] px-8 py-6 space-y-5">
+      <main className="pt-[64px] px-6 py-4 space-y-4">
 
-        {/* ── Barra superior ── */}
+        {/* ── Cabeçalho do painel ── */}
         <motion.div
           initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           className="flex items-center justify-between flex-wrap gap-3"
         >
-          {/* Filtros de tipo */}
-          <div className="flex items-center gap-2">
+          {/* Contadores de prioridade */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {(["urgente", "proximo", "prazo", "sem_data"] as Prioridade[]).map(p => {
+              const s = PRIORIDADE_STYLE[p]
+              const Icon = s.icon
+              const count = contadores[p]
+              return (
+                <div key={p} className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                  style={{ background: s.badge, border: `1px solid ${s.badgeTxt}30` }}>
+                  <Icon className="w-4 h-4" style={{ color: s.badgeTxt }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: s.badgeTxt }}>
+                    {count} {s.label}
+                  </span>
+                </div>
+              )
+            })}
+            <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>
+              Total: {contadores.total} item{contadores.total !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {/* Filtros tipo + relógio + refresh */}
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter className="w-4 h-4" style={{ color: "#94a3b8" }} />
-            {(["pedido", "garantia", "solicitacao"] as Tipo[]).map(t => {
-              const meta = TIPO_META[t]
+            {(["pedido", "garantia", "solicitacao"] as TipoItem[]).map(t => {
+              const c = TIPO_COLOR[t]
               const active = filtroTipo.has(t)
               return (
                 <button key={t} onClick={() => toggleTipo(t)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                   style={{
-                    background: active ? meta.bg : "#f1f5f9",
-                    color: active ? meta.color : "#94a3b8",
-                    border: `1px solid ${active ? meta.color + "40" : "#e2e8f0"}`,
+                    background: active ? c.bg : "#f1f5f9",
+                    color: active ? c.txt : "#94a3b8",
+                    border: `1px solid ${active ? c.txt + "50" : "#e2e8f0"}`,
                   }}>
-                  {meta.label}
+                  {TIPO_LABEL[t]}
                 </button>
               )
             })}
-          </div>
-
-          {/* Auto-refresh + atualizar */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setAutoRefresh(v => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
-              style={{
-                background: autoRefresh ? "#dcfce7" : "#f1f5f9",
-                color: autoRefresh ? "#16a34a" : "#64748b",
-                border: `1px solid ${autoRefresh ? "#86efac" : "#e2e8f0"}`,
-              }}>
-              <span className={autoRefresh ? "animate-pulse" : ""}>●</span>
-              {autoRefresh ? "Auto 60s" : "Manual"}
-            </button>
             <button onClick={load}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
               style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }}>
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               Atualizar
             </button>
-            <span style={{ fontSize: 11, color: "#94a3b8" }}>
-              {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
+            <div className="text-right" style={{ minWidth: 130 }}>
+              <p style={{ fontSize: 18, fontWeight: 800, color: "#0f2744", fontVariantNumeric: "tabular-nums" }}>{hora}</p>
+              <p style={{ fontSize: 10, color: "#94a3b8" }}>
+                Att: {ultimaAtt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
           </div>
         </motion.div>
 
-        {/* ── KPI Cards ── */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
-          {(["urgente", "proximo", "prazo", "sem_data"] as const).map((key, i) => {
-            const meta = PRIORITY_META[key]
-            const displayLabel = key === "urgente" ? "Urgentes" : key === "proximo" ? "Próx. a Vencer" : key === "prazo" ? "No Prazo" : "Sem Data"
-            const count = totais[key]
-            const card = { key, ...meta, label: displayLabel }
-            const Icon = meta.icon
-            return (
-              <motion.div key={card.key}
-                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-                style={{ background: "#fff", border: `1px solid ${card.bg}`, borderRadius: 16, padding: 20, boxShadow: "0 4px 16px rgba(15,39,68,0.05)" }}>
-                <div className="flex items-center justify-between mb-2">
-                  <p style={{ fontSize: 13, fontWeight: 500, color: "#60708A" }}>{card.label}</p>
-                  <div className="p-2 rounded-xl" style={{ background: card.bg }}>
-                    <Icon className="w-4 h-4" style={{ color: card.color }} />
-                  </div>
-                </div>
-                <p style={{ fontSize: 28, fontWeight: 800, color: count > 0 ? card.color : "#94a3b8" }}>{count}</p>
-                <p style={{ fontSize: 11, color: "#94a3b8" }}>item{count !== 1 ? "s" : ""} na fila</p>
-              </motion.div>
-            )
-          })}
-        </div>
-
-        {/* ── Fila ── */}
+        {/* ── Tabela ── */}
         {loading ? (
-          <div className="flex items-center justify-center py-16 gap-3" style={{ color: "#94a3b8" }}>
+          <div className="flex items-center justify-center py-20 gap-3" style={{ color: "#94a3b8" }}>
             <RefreshCw className="w-5 h-5 animate-spin" />
-            <span>Carregando fila de produção…</span>
+            <span style={{ fontSize: 15 }}>Carregando fila de produção…</span>
           </div>
         ) : filaFiltrada.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-16 gap-4">
+            className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="p-4 rounded-2xl" style={{ background: "#f0fdf4" }}>
-              <FlaskConical className="w-10 h-10" style={{ color: "#16a34a" }} />
+              <FlaskConical className="w-12 h-12" style={{ color: "#16a34a" }} />
             </div>
-            <p style={{ fontSize: 16, fontWeight: 600, color: "#475569" }}>Fila vazia!</p>
-            <p style={{ fontSize: 13, color: "#94a3b8" }}>Não há itens pendentes no laboratório.</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color: "#16a34a" }}>Fila vazia!</p>
+            <p style={{ fontSize: 14, color: "#94a3b8" }}>Não há itens pendentes na produção.</p>
           </motion.div>
         ) : (
-          <div className="space-y-7">
-            <PrioritySection priority="urgente"  items={byPriority("urgente")}  onMarcarPronto={handleMarcarPronto} markingId={markingId} />
-            <PrioritySection priority="proximo"  items={byPriority("proximo")}  onMarcarPronto={handleMarcarPronto} markingId={markingId} />
-            <PrioritySection priority="prazo"    items={byPriority("prazo")}    onMarcarPronto={handleMarcarPronto} markingId={markingId} />
-            <PrioritySection priority="sem_data" items={byPriority("sem_data")} onMarcarPronto={handleMarcarPronto} markingId={markingId} />
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            style={{ background: "#fff", border: "1px solid #DDE7F3", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 16px rgba(15,39,68,0.06)" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table className="w-full" style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
+                {/* Larguras fixas de cada coluna */}
+                <colgroup>
+                  <col style={{ width: 5   }} />  {/* stripe */}
+                  <col style={{ width: 56  }} />  {/* TIPO */}
+                  <col style={{ width: 130 }} />  {/* OS / REF */}
+                  <col style={{ width: 170 }} />  {/* LOJA */}
+                  <col style={{ width: 180 }} />  {/* CLIENTE */}
+                  <col style={{ width: 140 }} />  {/* VENDEDOR */}
+                  <col style={{ width: 160 }} />  {/* PRODUTO / OBS */}
+                  <col style={{ width: 90  }} />  {/* COMPRA */}
+                  <col style={{ width: 120 }} />  {/* PRAZO */}
+                  <col style={{ width: 200 }} />  {/* SITUAÇÃO ATUAL */}
+                </colgroup>
+                <thead>
+                  <tr style={{ background: "#0f2744" }}>
+                    {["", "TIPO", "OS / REF", "LOJA", "CLIENTE", "VENDEDOR", "PRODUTO / OBS", "COMPRA", "PRAZO", "SITUAÇÃO ATUAL"].map((h, i) => (
+                      <th key={i} style={{
+                        padding: "12px 14px", textAlign: "left",
+                        fontSize: 11, fontWeight: 700, color: "#93c5fd",
+                        textTransform: "uppercase", letterSpacing: "0.07em",
+                        whiteSpace: "nowrap", overflow: "hidden",
+                        borderBottom: "2px solid #1e3a5f",
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filaFiltrada.map((row, i) => {
+                    const s = PRIORIDADE_STYLE[row.prioridade]
+                    const tc = TIPO_COLOR[row.tipo]
+                    const Icon = s.icon
+                    const dias = diasRestantes(row.prazo)
+                    const isLast = i === filaFiltrada.length - 1
+                    return (
+                      <tr key={`${row.tipo}-${row.id}`}
+                        style={{
+                          background: row.prioridade === "urgente"
+                            ? (i % 2 === 0 ? "#fff5f5" : "#fef2f2")
+                            : row.prioridade === "proximo"
+                            ? (i % 2 === 0 ? "#fffbeb" : "#fefce8")
+                            : (i % 2 === 0 ? "#fff" : "#fafbff"),
+                          borderBottom: isLast ? "none" : "1px solid #f0f5ff",
+                        }}>
+
+                        {/* Stripe colorida */}
+                        <td style={{ width: 5, padding: 0 }}>
+                          <div style={{ width: 5, height: "100%", minHeight: 52, background: s.stripe }} />
+                        </td>
+
+                        {/* Tipo */}
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          <span className="px-2 py-0.5 rounded-md text-xs font-bold"
+                            style={{ background: tc.bg, color: tc.txt }}>
+                            {TIPO_LABEL[row.tipo]}
+                          </span>
+                        </td>
+
+                        {/* OS */}
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: "#0f2744" }}>{row.os}</span>
+                        </td>
+
+                        {/* Loja */}
+                        <td style={{ padding: "10px 14px", overflow: "hidden" }}>
+                          <span style={{ fontSize: 13, color: "#2F4162", fontWeight: 500,
+                            display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {row.loja ?? "—"}
+                          </span>
+                        </td>
+
+                        {/* Cliente */}
+                        <td style={{ padding: "10px 14px", overflow: "hidden" }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#061A35",
+                            display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {row.cliente ?? "—"}
+                          </span>
+                        </td>
+
+                        {/* Vendedor */}
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 13, color: "#40516F" }}>
+                            {row.vendedor ?? "—"}
+                          </span>
+                        </td>
+
+                        {/* Produto / Obs */}
+                        <td style={{ padding: "10px 14px", maxWidth: 180 }}>
+                          <span style={{ fontSize: 12, color: "#64748b", fontStyle: row.produto ? "normal" : "italic",
+                            display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {row.produto ?? "—"}
+                          </span>
+                        </td>
+
+                        {/* Compra */}
+                        <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 13, color: "#60708A" }}>{fmtData(row.compra)}</span>
+                        </td>
+
+                        {/* Prazo */}
+                        <td style={{ padding: "10px 14px" }}>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: s.stripe, display: "block", whiteSpace: "nowrap" }}>
+                            {fmtData(row.prazo)}
+                          </span>
+                          {dias && (
+                            <span className="px-1.5 py-0.5 rounded text-xs font-semibold"
+                              style={{ background: s.badge, color: s.badgeTxt, display: "inline-block", marginTop: 2, whiteSpace: "nowrap" }}>
+                              {dias}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Situação */}
+                        <td style={{ padding: "10px 20px 10px 14px", whiteSpace: "nowrap", minWidth: 200 }}>
+                          <div className="flex items-center gap-1.5">
+                            <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: s.stripe }} />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "#2F4162" }}>
+                              {row.situacao ?? "—"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Rodapé */}
+            <div className="px-5 py-3 flex items-center justify-between"
+              style={{ borderTop: "1px solid #EAF2FF", background: "#f8faff" }}>
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                Atualização automática a cada 60 segundos · {filaFiltrada.length} item{filaFiltrada.length !== 1 ? "s" : ""} na fila
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "#16a34a" }} />
+                <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>AO VIVO</span>
+              </div>
+            </div>
+          </motion.div>
         )}
       </main>
     </>

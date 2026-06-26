@@ -7,10 +7,11 @@ import {
   ShoppingBag, ClipboardList, Shield, MessageCircle,
   Target, Users, UserCheck, Truck, Tag, Eye,
   FlaskConical, Building2, Lock, LogOut,
-  BarChart3,
+  BarChart3, ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { useSidebar, SIDEBAR_W, SIDEBAR_CW } from "./SidebarContext"
 
 // ─── Dados de navegação ───────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ const navGroups = [
   },
 ]
 
-// ─── Sparkles (mesma lógica do popup de boas-vindas) ─────────────────────────
+// ─── Sparkles ─────────────────────────────────────────────────────────────────
 
 const SPARKLES = [
   { x: 13, y: 33, size: 36, color: "#fcd34d", dur: 1.8, delay: 0    },
@@ -95,7 +96,6 @@ function PopupDespedida({ nome }: { nome: string }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Sparkles */}
       {SPARKLES.map((s, i) => (
         <motion.div
           key={i}
@@ -108,29 +108,24 @@ function PopupDespedida({ nome }: { nome: string }) {
         </motion.div>
       ))}
 
-      {/* Card */}
       <motion.div
         className="relative mx-4 text-center"
         style={{
-          width: "100%",
-          maxWidth: 460,
-          padding: "44px 44px 38px",
+          width: "100%", maxWidth: 460, padding: "44px 44px 38px",
           borderRadius: 28,
           background: "linear-gradient(160deg, #e0d7ff 0%, #bfdbfe 35%, #fbcfe8 70%, #fed7aa 100%)",
           boxShadow: "0 12px 56px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12)",
         }}
         initial={{ opacity: 0, scale: 0.85, y: 30 }}
-        animate={{ opacity: 1, scale: 1,    y: 0  }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: -16 }}
         transition={{ type: "spring", stiffness: 240, damping: 22, delay: 0.1 }}
       >
-        {/* Ícone lua / descanso flutuando */}
         <motion.div
           className="flex items-center justify-center mx-auto mb-5"
           style={{
             width: 84, height: 84, borderRadius: "50%",
-            background: "rgba(255,255,255,0.55)",
-            backdropFilter: "blur(6px)",
+            background: "rgba(255,255,255,0.55)", backdropFilter: "blur(6px)",
             boxShadow: "0 0 0 2px rgba(255,255,255,0.7), 0 6px 24px rgba(139,92,246,0.22)",
             fontSize: 44,
           }}
@@ -140,55 +135,39 @@ function PopupDespedida({ nome }: { nome: string }) {
           🌙
         </motion.div>
 
-        {/* Título */}
         <motion.h2
-          style={{
-            fontSize: 26, fontWeight: 800, color: "#1e1b4b", lineHeight: 1.35,
-            marginBottom: 8, fontFamily: "system-ui,-apple-system,sans-serif",
-          }}
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          style={{ fontSize: 26, fontWeight: 800, color: "#1e1b4b", lineHeight: 1.35, marginBottom: 8, fontFamily: "system-ui,-apple-system,sans-serif" }}
+          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
         >
           Até logo, {nome}!
         </motion.h2>
 
-        {/* Divisor */}
         <motion.div
           className="flex items-center justify-center gap-3 my-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.44 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.44 }}
         >
           <div style={{ height: 1, width: 56, background: "linear-gradient(90deg,transparent,#cbd5e1)" }} />
           <span style={{ fontSize: 16 }}>✨</span>
           <div style={{ height: 1, width: 56, background: "linear-gradient(90deg,#cbd5e1,transparent)" }} />
         </motion.div>
 
-        {/* Mensagem */}
         <motion.p
           style={{ fontSize: 15, color: "#4c3d8f", marginBottom: 22, lineHeight: 1.6 }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.54 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.54 }}
         >
           Obrigado pelo seu trabalho hoje.<br />
           Descanse bem e até a próxima! 😊
         </motion.p>
 
-        {/* Barra de progresso */}
         <motion.div
           className="mx-auto rounded-full overflow-hidden"
           style={{ height: 8, maxWidth: 260, background: "rgba(255,255,255,0.45)", position: "relative" }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.64 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.64 }}
         >
           <motion.div
             className="h-full rounded-full relative overflow-hidden"
             style={{ background: "linear-gradient(90deg,#8b5cf6,#a78bfa,#c4b5fd)" }}
-            initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
+            initial={{ width: "0%" }} animate={{ width: "100%" }}
             transition={{ duration: 2.5, delay: 0.64, ease: "easeOut" }}
           >
             <motion.div
@@ -211,26 +190,22 @@ function formatarNome(raw: string): string {
 }
 
 export function Sidebar() {
-  const pathname = usePathname()
+  const pathname              = usePathname()
+  const { collapsed, toggle } = useSidebar()
 
-  const [despedida,  setDespedida]  = useState(false)
-  const [nomeAdeus,  setNomeAdeus]  = useState("")
+  const [despedida, setDespedida] = useState(false)
+  const [nomeAdeus, setNomeAdeus] = useState("")
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/")
 
   async function handleLogout() {
     const sb = createSupabaseBrowserClient()
-
-    // Resolve o nome antes de deslogar
     const { data: { user } } = await sb.auth.getUser()
     const meta = user?.user_metadata ?? {}
     const nome = meta.display_name || meta.nome || formatarNome(meta.username || "")
-
     setNomeAdeus(nome)
     setDespedida(true)
-
-    // Aguarda a animação (3s) e então desloga
     setTimeout(async () => {
       await sb.auth.signOut()
       window.location.href = "/login"
@@ -239,21 +214,25 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Popup despedida */}
       <AnimatePresence>
         {despedida && <PopupDespedida nome={nomeAdeus} />}
       </AnimatePresence>
 
-      <aside
+      <motion.aside
         className="fixed left-0 top-0 h-screen flex flex-col z-30 select-none overflow-hidden"
+        animate={{ width: collapsed ? SIDEBAR_CW : SIDEBAR_W }}
+        transition={{ duration: 0.25, ease: "easeInOut" }}
         style={{
-          width: 260,
           background: "linear-gradient(180deg, #001E3C 0%, #004086 60%, #003070 100%)",
           boxShadow: "4px 0 24px rgba(6,26,53,0.3)",
         }}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-5 pt-6 pb-4">
+        {/* ── Logo + botão toggle ── */}
+        <div
+          className="flex items-center px-4 pt-6 pb-4"
+          style={{ height: 72, overflow: "hidden", flexShrink: 0 }}
+        >
+          {/* Ícone do leão */}
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
             style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.18)" }}
@@ -261,51 +240,160 @@ export function Sidebar() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/leao_branco.png" alt="Leão Vision" className="w-7 h-7 object-contain" />
           </div>
-          <span className="font-bold text-xl tracking-tight leading-none">
-            <span style={{ color: "#FFFFFF" }}>Leão </span>
-            <span style={{ color: "#7EB8FF" }}>Vision </span>
-            <span style={{ color: "#FBBF24" }}>ERP</span>
-          </span>
+
+          {/* Texto do logo — some ao colapsar */}
+          <div
+            style={{
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              maxWidth: collapsed ? 0 : 180,
+              opacity: collapsed ? 0 : 1,
+              transition: "max-width 0.22s ease, opacity 0.18s ease",
+              marginLeft: collapsed ? 0 : 12,
+            }}
+          >
+            <span className="font-bold text-xl tracking-tight leading-none">
+              <span style={{ color: "#FFFFFF" }}>Leão </span>
+              <span style={{ color: "#7EB8FF" }}>Vision </span>
+              <span style={{ color: "#FBBF24" }}>ERP</span>
+            </span>
+          </div>
+
+          {/* Botão toggle — alinhado à direita quando expandido */}
+          {!collapsed && (
+            <button
+              onClick={toggle}
+              title="Recolher menu"
+              className="ml-auto flex-shrink-0 flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                width: 28, height: 28,
+                background: "rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.6)",
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.16)"
+                e.currentTarget.style.color = "#fff"
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)"
+                e.currentTarget.style.color = "rgba(255,255,255,0.6)"
+              }}
+            >
+              <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-4 space-y-4 pb-2">
+        {/* Botão expandir — visível só quando colapsado, centralizado */}
+        {collapsed && (
+          <div className="flex justify-center pb-2" style={{ flexShrink: 0 }}>
+            <button
+              onClick={toggle}
+              title="Expandir menu"
+              className="flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                width: 34, height: 28,
+                background: "rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.6)",
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.16)"
+                e.currentTarget.style.color = "#fff"
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)"
+                e.currentTarget.style.color = "rgba(255,255,255,0.6)"
+              }}
+            >
+              <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
+
+        {/* ── Nav ── */}
+        <nav className="flex-1 overflow-y-auto space-y-4 pb-2" style={{ paddingLeft: collapsed ? 8 : 16, paddingRight: collapsed ? 8 : 16 }}>
           {navGroups.map((group) => (
             <div key={group.label}>
-              <p
-                className="px-2 mb-1.5 text-xs font-semibold uppercase tracking-widest"
-                style={{ color: "#8FB3E6", letterSpacing: "0.08em" }}
+              {/* Label do grupo — some ao colapsar */}
+              <div
+                style={{
+                  overflow: "hidden",
+                  maxHeight: collapsed ? 0 : 24,
+                  opacity: collapsed ? 0 : 1,
+                  transition: "max-height 0.22s ease, opacity 0.15s ease",
+                  marginBottom: collapsed ? 0 : 6,
+                }}
               >
-                {group.label}
-              </p>
+                <p
+                  className="px-2 text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: "#8FB3E6", letterSpacing: "0.08em" }}
+                >
+                  {group.label}
+                </p>
+              </div>
+
               <ul className="space-y-0.5">
                 {group.items.map((item) => {
                   const active = isActive(item.href)
                   return (
-                    <li key={item.label}>
+                    <li key={item.label} className="relative group">
                       <Link
                         href={item.href}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
-                        style={
-                          active
+                        className="w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150"
+                        style={{
+                          padding: collapsed ? "10px 0" : "10px 12px",
+                          justifyContent: collapsed ? "center" : "flex-start",
+                          ...(active
                             ? {
                                 background: "linear-gradient(90deg, #0F5BFF 0%, #0646D9 100%)",
                                 color: "#ffffff",
                                 fontWeight: 600,
                                 boxShadow: "0 8px 20px rgba(15,91,255,0.28)",
                               }
-                            : { color: "rgba(255,255,255,0.75)" }
-                        }
-                        onMouseEnter={(e) => {
+                            : { color: "rgba(255,255,255,0.75)" }),
+                        }}
+                        onMouseEnter={e => {
                           if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.08)"
                         }}
-                        onMouseLeave={(e) => {
+                        onMouseLeave={e => {
                           if (!active) e.currentTarget.style.background = "transparent"
                         }}
                       >
                         <item.icon className="flex-shrink-0 w-[18px] h-[18px]" strokeWidth={2} />
-                        <span style={{ fontSize: 14 }}>{item.label}</span>
+
+                        {/* Label — some ao colapsar */}
+                        <span
+                          style={{
+                            fontSize: 14,
+                            overflow: "hidden",
+                            whiteSpace: "nowrap",
+                            maxWidth: collapsed ? 0 : 180,
+                            opacity: collapsed ? 0 : 1,
+                            transition: "max-width 0.22s ease, opacity 0.15s ease",
+                          }}
+                        >
+                          {item.label}
+                        </span>
                       </Link>
+
+                      {/* Tooltip ao colapsar */}
+                      {collapsed && (
+                        <div
+                          className="pointer-events-none absolute left-full top-1/2 ml-3 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{
+                            transform: "translateY(-50%)",
+                            background: "#0f2744",
+                            color: "#e0eeff",
+                            border: "1px solid rgba(255,255,255,0.12)",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                            zIndex: 100,
+                          }}
+                        >
+                          {item.label}
+                        </div>
+                      )}
                     </li>
                   )
                 })}
@@ -314,26 +402,67 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all"
-            style={{ color: "rgba(255,255,255,0.55)" }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.08)"
-              e.currentTarget.style.color = "rgba(255,255,255,0.9)"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent"
-              e.currentTarget.style.color = "rgba(255,255,255,0.55)"
-            }}
-          >
-            <LogOut className="w-[18px] h-[18px]" strokeWidth={2} />
-            <span style={{ fontSize: 14 }}>Sair</span>
-          </button>
+        {/* ── Logout ── */}
+        <div
+          className="py-4"
+          style={{
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            paddingLeft: collapsed ? 8 : 16,
+            paddingRight: collapsed ? 8 : 16,
+          }}
+        >
+          <div className="relative group">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 rounded-xl text-sm transition-all"
+              style={{
+                padding: collapsed ? "10px 0" : "10px 12px",
+                justifyContent: collapsed ? "center" : "flex-start",
+                color: "rgba(255,255,255,0.55)",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)"
+                e.currentTarget.style.color = "rgba(255,255,255,0.9)"
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "transparent"
+                e.currentTarget.style.color = "rgba(255,255,255,0.55)"
+              }}
+            >
+              <LogOut className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={2} />
+              <span
+                style={{
+                  fontSize: 14,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  maxWidth: collapsed ? 0 : 180,
+                  opacity: collapsed ? 0 : 1,
+                  transition: "max-width 0.22s ease, opacity 0.15s ease",
+                }}
+              >
+                Sair
+              </span>
+            </button>
+
+            {/* Tooltip sair */}
+            {collapsed && (
+              <div
+                className="pointer-events-none absolute left-full top-1/2 ml-3 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{
+                  transform: "translateY(-50%)",
+                  background: "#0f2744",
+                  color: "#e0eeff",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                  zIndex: 100,
+                }}
+              >
+                Sair
+              </div>
+            )}
+          </div>
         </div>
-      </aside>
+      </motion.aside>
     </>
   )
 }

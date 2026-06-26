@@ -5,6 +5,7 @@ import { Bell, ChevronDown } from "lucide-react"
 import { initials } from "@/lib/utils"
 import { Tooltip } from "@/components/ui/Tooltip"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { useSidebar, SIDEBAR_W, SIDEBAR_CW } from "./SidebarContext"
 
 interface HeaderProps {
   breadcrumbs: string[]
@@ -20,6 +21,7 @@ function fmtUsername(u: string): string {
 }
 
 export function Header({ breadcrumbs, title }: HeaderProps) {
+  const { collapsed } = useSidebar()
   const [displayName, setDisplayName] = useState("Usuário")
 
   useEffect(() => {
@@ -34,7 +36,8 @@ export function Header({ breadcrumbs, title }: HeaderProps) {
     <header
       className="fixed top-0 right-0 flex items-center justify-between px-8 z-20"
       style={{
-        left: 260,
+        left: collapsed ? SIDEBAR_CW : SIDEBAR_W,
+        transition: "left 0.25s ease",
         height: 64,
         background: "#fff",
         borderBottom: "1px solid #E4EDFA",
