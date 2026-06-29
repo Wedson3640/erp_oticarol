@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  ShoppingBag, ClipboardList, Shield, MessageCircle,
+  LayoutDashboard, ShoppingBag, ClipboardList, Shield, MessageCircle,
   Target, Users, UserCheck, Truck, Tag, Eye,
   FlaskConical, Building2, Lock, LogOut,
   BarChart3, ChevronLeft, ChevronRight,
@@ -314,6 +314,64 @@ export function Sidebar() {
 
         {/* ── Nav ── */}
         <nav className="flex-1 overflow-y-auto space-y-4 pb-2" style={{ paddingLeft: collapsed ? 8 : 16, paddingRight: collapsed ? 8 : 16 }}>
+
+          {/* Dashboard — item fixo no topo */}
+          <div className="relative group">
+            <Link
+              href="/dashboard"
+              className="w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-150"
+              style={{
+                padding: collapsed ? "10px 0" : "10px 12px",
+                justifyContent: collapsed ? "center" : "flex-start",
+                ...(isActive("/dashboard")
+                  ? {
+                      background: "linear-gradient(90deg, #0F5BFF 0%, #0646D9 100%)",
+                      color: "#ffffff",
+                      fontWeight: 600,
+                      boxShadow: "0 8px 20px rgba(15,91,255,0.28)",
+                    }
+                  : { color: "rgba(255,255,255,0.75)" }),
+              }}
+              onMouseEnter={e => {
+                if (!isActive("/dashboard")) e.currentTarget.style.background = "rgba(255,255,255,0.08)"
+              }}
+              onMouseLeave={e => {
+                if (!isActive("/dashboard")) e.currentTarget.style.background = "transparent"
+              }}
+            >
+              <LayoutDashboard className="flex-shrink-0 w-[18px] h-[18px]" strokeWidth={2} />
+              <span
+                style={{
+                  fontSize: 14,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  maxWidth: collapsed ? 0 : 180,
+                  opacity: collapsed ? 0 : 1,
+                  transition: "max-width 0.22s ease, opacity 0.15s ease",
+                }}
+              >
+                Dashboard
+              </span>
+            </Link>
+
+            {/* Tooltip ao colapsar */}
+            {collapsed && (
+              <div
+                className="pointer-events-none absolute left-full top-1/2 ml-3 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{
+                  transform: "translateY(-50%)",
+                  background: "#0f2744",
+                  color: "#e0eeff",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                  zIndex: 100,
+                }}
+              >
+                Dashboard
+              </div>
+            )}
+          </div>
+
           {navGroups.map((group) => (
             <div key={group.label}>
               {/* Label do grupo — some ao colapsar */}
