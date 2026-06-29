@@ -23,30 +23,33 @@ interface ClientHint { id: number; name: string; cpf: string | null }
 
 // Linha da view vw_pedidos — colunas planas, sem joins no PostgREST
 interface OrderRow {
-  id:                number
-  source_erp_id:     number | null
-  source_rails_id:   number | null
-  source:            string
-  os_number:         string
-  os_sequence:       string | null
-  situation:         string | null
-  urgent:            boolean
-  purchase_date:     string | null
-  scheduled_delivery:string | null
+  id:                     number
+  source_erp_id:          number | null
+  source_rails_id:        number | null
+  source:                 string
+  os_number:              string
+  os_sequence:            string | null
+  situation:              string | null
+  situation_updated_at:   string | null   // quando a situação mudou no PHP
+  urgent:                 boolean
+  purchase_date:          string | null
+  scheduled_delivery:     string | null
+  new_scheduled_delivery: string | null   // prazo revisado
+  new_scheduled_reason:   string | null   // motivo da revisão
   // Cliente
-  customer_id:       number | null
-  customer_name:     string | null
-  customer_cpf:      string | null
+  customer_id:            number | null
+  customer_name:          string | null
+  customer_cpf:           string | null
   // Vendedor(a)
-  employee_id:       number | null
-  employee_name:     string | null
+  employee_id:            number | null
+  employee_name:          string | null
   // Loja
-  store_id:          number | null
-  store_code:        string | null
-  store_name:        string | null
+  store_id:               number | null
+  store_code:             string | null
+  store_name:             string | null
   // Lab
-  laboratory_id:     number | null
-  laboratory_name:   string | null
+  laboratory_id:          number | null
+  laboratory_name:        string | null
 }
 
 // Situações de pedido — lista fixa (espelha o sistema legado)
@@ -557,16 +560,24 @@ export default function PedidosPage() {
                               {fmtDate(o.scheduled_delivery)}
                             </span>
                           </div>
+                          {/* Prazo revisado — igual ao PHP: mostra abaixo quando diferente */}
+                          {o.new_scheduled_delivery && o.new_scheduled_delivery !== o.scheduled_delivery && (
+                            <Tooltip label={o.new_scheduled_reason ?? "Prazo revisado"}>
+                              <span className="text-xs block mt-0.5 cursor-help" style={{ color: "#f59e0b", fontWeight: 600 }}>
+                                → {fmtDate(o.new_scheduled_delivery)}
+                              </span>
+                            </Tooltip>
+                          )}
                         </td>
 
-                        {/* STATUS: badge de situação + data de compra como referência */}
+                        {/* STATUS: badge de situação + quando mudou (igual ao PHP) */}
                         <td className="px-4 py-3">
                           {sit !== "—"
                             ? <StatusBadge status={sit} size="sm" />
                             : <span style={{ fontSize: 12, color: "#7e8b9c" }}>—</span>
                           }
                           <span className="text-xs block mt-0.5" style={{ color: "#7e8b9c" }}>
-                            {fmtDate(o.purchase_date)}
+                            {fmtDate(o.situation_updated_at ?? o.purchase_date)}
                           </span>
                         </td>
 

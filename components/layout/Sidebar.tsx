@@ -12,6 +12,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { useSidebar, SIDEBAR_W, SIDEBAR_CW } from "./SidebarContext"
+import { canAccess } from "@/lib/permissions"
 
 // ─── Dados de navegação ───────────────────────────────────────────────────────
 
@@ -190,8 +191,8 @@ function formatarNome(raw: string): string {
 }
 
 export function Sidebar() {
-  const pathname              = usePathname()
-  const { collapsed, toggle } = useSidebar()
+  const pathname                              = usePathname()
+  const { collapsed, toggle, userGroups, groupsReady } = useSidebar()
 
   const [despedida, setDespedida] = useState(false)
   const [nomeAdeus, setNomeAdeus] = useState("")
@@ -315,7 +316,7 @@ export function Sidebar() {
         {/* ── Nav ── */}
         <nav className="flex-1 overflow-y-auto space-y-4 pb-2" style={{ paddingLeft: collapsed ? 8 : 16, paddingRight: collapsed ? 8 : 16 }}>
 
-          {/* Dashboard — item fixo no topo */}
+          {/* Dashboard — item fixo no topo (sempre visível) */}
           <div className="relative group">
             <Link
               href="/dashboard"
@@ -372,8 +373,16 @@ export function Sidebar() {
             )}
           </div>
 
-          {navGroups.map((group) => (
-            <div key={group.label}>
+          {navGroups.map((group) => {
+            // Filtra itens que o usuário tem acesso (só após grupos carregarem)
+            const visibleItems = groupsReady
+              ? group.items.filter((item) => canAccess(item.href, userGroups))
+              : group.items  // mostra tudo enquanto carrega (middleware protege)
+
+            if (visibleItems.length === 0) return null
+
+            return (
+              <div key={group.label}>
               {/* Label do grupo — some ao colapsar */}
               <div
                 style={{
@@ -393,7 +402,7 @@ export function Sidebar() {
               </div>
 
               <ul className="space-y-0.5">
-                {group.items.map((item) => {
+                {visibleItems.map((item) => {
                   const active = isActive(item.href)
                   return (
                     <li key={item.label} className="relative group">
@@ -457,7 +466,8 @@ export function Sidebar() {
                 })}
               </ul>
             </div>
-          ))}
+            )
+          })}
         </nav>
 
         {/* ── Logout ── */}
