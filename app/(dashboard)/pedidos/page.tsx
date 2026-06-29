@@ -13,7 +13,7 @@ import {
 import { Tooltip } from "@/components/ui/Tooltip"
 import Link from "next/link"
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { fmtDate, fmtOs, prazoOk } from "@/lib/types"
+import { fmtDate, fmtDateTime, fmtOs, prazoOk } from "@/lib/types"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -577,7 +577,9 @@ export default function PedidosPage() {
                             : <span style={{ fontSize: 12, color: "#7e8b9c" }}>—</span>
                           }
                           <span className="text-xs block mt-0.5" style={{ color: "#7e8b9c" }}>
-                            {fmtDate(o.situation_updated_at ?? o.purchase_date)}
+                            {o.situation_updated_at
+                              ? fmtDateTime(o.situation_updated_at)
+                              : fmtDate(o.purchase_date)}
                           </span>
                         </td>
 

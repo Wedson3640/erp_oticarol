@@ -196,13 +196,22 @@ export function fmtDate(iso: string | null | undefined): string {
   return `${day}/${m}/${y}`
 }
 
-/** Formata "YYYY-MM-DD HH:MM:SS..." → "DD/MM/YYYY HH:MM" */
+/** Formata ISO → "DD/MM/YYYY às HH:MM" (horário de Fortaleza/Piauí, UTC-3) */
 export function fmtDateTime(iso: string | null | undefined): string {
   if (!iso) return "—"
-  const [datePart, timePart] = iso.split("T")
-  const [y, m, d] = datePart.split("-")
-  const time = timePart ? timePart.slice(0, 5) : ""
-  return time ? `${d}/${m}/${y} ${time}` : `${d}/${m}/${y}`
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return "—"
+  const fmt = new Intl.DateTimeFormat("pt-BR", {
+    day:      "2-digit",
+    month:    "2-digit",
+    year:     "numeric",
+    hour:     "2-digit",
+    minute:   "2-digit",
+    hour12:   false,
+    timeZone: "America/Fortaleza",   // UTC-3, sem horário de verão (igual ao Piauí)
+  })
+  const p = Object.fromEntries(fmt.formatToParts(d).map(({ type, value }) => [type, value]))
+  return `${p.day}/${p.month}/${p.year} às ${p.hour}:${p.minute}`
 }
 
 /** true se a data ISO ainda não venceu */
