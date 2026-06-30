@@ -78,12 +78,10 @@ export default function PedidosPage() {
   const [loadingOrders, setLoadingOrders] = useState(false)
 
   // ── Filtros
-  // monthFilter: "YYYY-MM" — padrão = mês atual; "" = todos os meses
-  const nowDate = new Date()
-  const defaultMonth = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}`
-  const [monthFilter,  setMonthFilter]  = useState(defaultMonth)
-  // statusFilter: "pendente" = exclui Entregue+Cancelado (padrão fila de trabalho)
-  const [statusFilter, setStatusFilter] = useState("pendente")
+  // monthFilter: "YYYY-MM" — "" = todos os meses (padrão); filtro só quando usuário escolher
+  const [monthFilter,  setMonthFilter]  = useState("")
+  // statusFilter: "" = todos os status (padrão); "pendente" = fila de trabalho
+  const [statusFilter, setStatusFilter] = useState("")
   const [labFilter,    setLabFilter]    = useState("")
   const [storeFilter,  setStoreFilter]  = useState("")
 
@@ -276,7 +274,8 @@ export default function PedidosPage() {
               const mesLabel = monthFilter
                 ? new Date(Number(y), Number(m) - 1).toLocaleString("pt-BR", { month: "long", year: "numeric" })
                 : null
-              return `${total} pedido${total !== 1 ? "s" : ""}${mesLabel ? ` com entrega em ${mesLabel}` : ""}${statusFilter === "pendente" ? " pendentes" : ""}`
+              const sufixo = statusFilter === "pendente" ? " pendentes" : statusFilter ? ` — ${statusFilter}` : ""
+              return `${total} pedido${total !== 1 ? "s" : ""}${mesLabel ? ` com entrega em ${mesLabel}` : ""}${sufixo}`
             })()}
           </span>
           <div className="flex items-center gap-2">
@@ -421,7 +420,7 @@ export default function PedidosPage() {
 
           <button
             onClick={() => {
-              setMonthFilter(defaultMonth); setStatusFilter("pendente")
+              setMonthFilter(""); setStatusFilter("")
               setLabFilter(""); setStoreFilter("")
               clearClientSearch()
             }}
